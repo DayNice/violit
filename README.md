@@ -191,12 +191,6 @@ app.write(lambda: f"Current Time: {time.time()}")  # Auto-dependency tracking
 # 3. Clear Actions with Callbacks
 app.button("Click", on_click=lambda: counter.set(counter.value + 1))
 
-# 4. Group with Fragment if needed (Streamlit-like)
-@app.fragment
-def dashboard():
-    # This area re-runs when internal State changes
-    app.header("Dashboard")
-    app.metric("Visitors", visitors.value)
 ```
 
 ---

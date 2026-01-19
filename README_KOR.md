@@ -3,7 +3,7 @@
 > **"Faster than Light, Beautiful as Violet."**
 > **Streamlit의 직관성 × React의 퍼포먼스**
 
-**Violit(바이올릿)**은 Streamlit의 치명적인 단점인 **전체 스크립트 재실행(Full Script Rerun)** 문제를 **O(1) State Architecture**로 완벽하게 해결한 차세대 Python 웹 프레임워크입니다.
+**Violit(바이올릿)** 은 Streamlit의 치명적인 단점인 **전체 스크립트 재실행(Full Script Rerun)** 문제를 **O(1) State Architecture**로 완벽하게 해결한 차세대 Python 웹 프레임워크입니다.
 
 가장 우아한 문법으로, 빛의 속도로 반응하는 애플리케이션을 만드세요.
 
@@ -451,12 +451,6 @@ Violit은 현대적인 웹 기술과 파이썬의 강력함을 결합했습니�
 ## 📝 License
 
 MIT License
-
----
-
-## 🤖 Development
-
-This project was developed with the assistance of AI tools (Cursor AI) for code generation and development acceleration. All architectural decisions and design choices were made by the project author.
 
 ---
 

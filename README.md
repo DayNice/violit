@@ -423,7 +423,6 @@ Unlike other frameworks, Violit:
 
 ```bash
 .
-├── demo_*.py          # Various demo applications
 ├── violit/            # Framework source code
 │   ├── app.py         # Main App class & entry point
 │   ├── broadcast.py   # Real-time WebSocket broadcasting

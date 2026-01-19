@@ -12,7 +12,7 @@
 가장 우아한 문법으로, 빛의 속도로 반응하는 애플리케이션을 만드세요.
 
 <p align="center">
-<img src="https://img.shields.io/pypi/v/violit?color=blueviolet&style=flat-square" alt="PyPI">
+<img src="https://img.shields.io/pypi/v/violit?color=blueviolet&style=flat-square&ignore=cache" alt="PyPI">
 <img src="https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat-square" alt="Python 3.10+">
 <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="MIT License">
 <img src="https://img.shields.io/badge/Framework-FastAPI-009688.svg?style=flat-square" alt="FastAPI">

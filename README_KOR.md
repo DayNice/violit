@@ -423,7 +423,6 @@ Violit은 현대적인 웹 기술과 파이썬의 강력함을 결합했습니�
 
 ```bash
 .
-├── demo_*.py          # 다양한 데모 애플리케이션
 ├── violit/            # 프레임워크 소스 코드
 │   ├── app.py         # 메인 App 클래스 및 진입점
 │   ├── broadcast.py   # 실시간 WebSocket 브로드캐스팅

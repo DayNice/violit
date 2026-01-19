@@ -1,4 +1,4 @@
-![img1](./assets/violit_glare_small.png)
+<p align="center"> ![img1](./assets/violit_glare_small.png) </p>
 
 # 💜 Violit
 

@@ -29,7 +29,7 @@ Violit isn't just "faster Streamlit". **The architecture itself is different.**
 | **UX/UI** | Slow response, screen flickering | **React-grade Reactivity**, smooth with no flicker |
 | **Optimization** | Complex optimizations like `@cache`, `@fragment` required | **No optimization code needed** (Optimized by design) |
 | **Scalability** | Limited concurrent users (High memory usage) | **Lite Mode** supports massive traffic 🌐 |
-| **Deployment** | Web browser only | Web + **Standalone Desktop App (.exe)** 💻 |
+| **Deployment** | Web browser only | Web + **Desktop App Mode** 💻 |
 | **Design** | Basic default design | **30+ Premium Themes** built-in 🎨 |
 
 ### ⭐ Violit Signatures
@@ -54,7 +54,7 @@ Violit isn't just "faster Streamlit". **The architecture itself is different.**
 | **Panel** | Param Based | ⭐⭐ Hard | ⚡ Fast | ❌ | ✅ |
 | **NiceGUI** | Vue Based | ⭐⭐⭐⭐ Easy | ⚡ Fast | ✅ | ✅ |
 | **Reflex** | React Style | ⭐⭐ Hard | ⚡ Fast | ❌ | ✅ |
-| **Violit 💜** | **Zero Rerun (O(1))** | ⭐⭐⭐⭐⭐ **Very Easy** | **⚡⚡ Fastest** | **✅ Native** | **✅ Built-in** |
+| **Violit 💜** | **Zero Rerun (O(1))** | ⭐⭐⭐⭐⭐ **Very Easy** | **⚡⚡ Fastest** | **✅** | **✅ Built-in** |
 
 ### 🎯 Reasons to Choose Violit
 
@@ -86,9 +86,9 @@ app.write(lambda: f"Hello, {name.value}!")
 - No need for Panel's **complex Param system**.
 - Easy like Streamlit, powerful like Panel.
 
-#### 4️⃣ **vs NiceGUI**: Native Apps with Python Only
+#### 4️⃣ **vs NiceGUI**: Desktop Apps with Python Only
 - Supports **real-time WebSocket** like NiceGUI.
-- But Violit adds **30+ Premium Themes** and **Native Desktop Builds**.
+- But Violit adds **30+ Premium Themes** and **Desktop Mode**.
 - No Vue.js knowledge needed, Python is enough.
 
 #### 5️⃣ **vs Reflex**: Start Immediately Without Config
@@ -107,7 +107,7 @@ app.run()  # Done!
 1. **Zero Configuration**: `pip install violit` → Start immediately.
 2. **Zero Learning Curve**: If you know Streamlit, you're done in 5 minutes.
 3. **Zero Performance Issues**: O(1) architecture scales to any size.
-4. **Native Desktop**: Generate .exe/.app with a single `--native` line.
+4. **Desktop Mode**: Run desktop mode with a single `--native` line.
 5. **30+ Premium Themes**: Expert-level UI without a designer.
 6. **Real-time Broadcasting**: Multi-user synchronization built-in.
 
@@ -270,7 +270,7 @@ app.run()
 
 ### 3. Run
 
-Run in web browser mode or native app mode.
+Run in web browser mode or desktop app mode.
 
 ```bash
 # Run in Web Browser (Default: WebSocket Mode)
@@ -387,7 +387,7 @@ Violit is absorbing the features of popular Streamlit third-party libraries **na
 Unique features found only in Violit, not in Streamlit:
 - **Broadcasting API**: Real-time multi-user synchronization (`app.broadcaster`)
 - **Card List**: Auto-managed dynamic list UI (`app.card_list`)
-- **Native Desktop**: Instant desktop app via `--native` flag
+- **Desktop Mode**: Instant desktop app via `--native` flag
 - **Hot Reload**: Auto-refresh on code change (Dev mode)
 - **Animation Modes**: Smooth page transitions (`animation_mode='soft'`)
 
@@ -403,7 +403,7 @@ Violit combines modern web technologies with the power of Python.
 * **State**: Signal-based Reactivity - Solid.js style fine-grained reactivity
 * **Charts**: Plotly.js - Interactive charts
 * **Data Grid**: AG-Grid - Enterprise-grade data tables
-* **Native**: pywebview - Lightweight desktop apps without Electron
+* **Desktop**: pywebview - Lightweight desktop apps without Electron
 
 ### 📦 Zero Dependencies Bloat
 

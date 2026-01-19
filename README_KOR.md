@@ -29,7 +29,7 @@ Violit은 단순히 "빠른 Streamlit"이 아닙니다. **아키텍처 자체가
 | **UX/UI** | 반응 느림, 화면 깜빡임 발생 | **React급 반응성**, 깜빡임 없는 부드러움 |
 | **Optimization** | `@cache`, `@fragment` 등 복잡한 최적화 필수 | **최적화 코드 불필요** (설계 자체가 최적화됨) |
 | **Scalability** | 동시 접속자 처리 제한적 (메모리 과다) | **Lite Mode** 지원으로 대규모 트래픽 대응 🌐 |
-| **Deployment** | 웹 브라우저만 지원 | 웹 + **독립 Desktop 앱 (.exe)** 💻 |
+| **Deployment** | 웹 브라우저만 지원 | 웹 + **Desktop App Mode** 💻 |
 | **Design** | 투박한 기본 디자인 | **30+ 전문가급 테마** 내장 🎨 |
 
 ### ⭐ Violit만의 시그니처
@@ -39,7 +39,7 @@ Violit은 단순히 "빠른 Streamlit"이 아닙니다. **아키텍처 자체가
 3. **Hybrid Runtime**:
    * **WebSocket Mode**: 초저지연 양방향 통신, 실시간 브로드캐스팅 (Default) ⚡
    * **Lite Mode**: HTTP 기반, 수천 명의 동시 접속자 처리 (대규모 대시보드용)
-4. **Build Native**: `--native` 옵션 한 줄로 Electron 없이 완벽한 데스크탑 앱을 만듭니다.
+4. **Desktop Mode**: `--native` 옵션 한 줄로 Electron 없이 완벽한 데스크탑 앱을 만듭니다.
 
 ---
 
@@ -54,7 +54,7 @@ Violit은 단순히 "빠른 Streamlit"이 아닙니다. **아키텍처 자체가
 | **Panel** | Param 기반 | ⭐⭐ 어려움 | ⚡ 빠름 | ❌ | ✅ |
 | **NiceGUI** | Vue 기반 | ⭐⭐⭐⭐ 쉬움 | ⚡ 빠름 | ✅ | ✅ |
 | **Reflex** | React 스타일 | ⭐⭐ 어려움 | ⚡ 빠름 | ❌ | ✅ |
-| **Violit 💜** | **Zero Rerun (O(1))** | ⭐⭐⭐⭐⭐ **매우 쉬움** | **⚡⚡ 최고속** | **✅ Native** | **✅ Built-in** |
+| **Violit 💜** | **Zero Rerun (O(1))** | ⭐⭐⭐⭐⭐ **매우 쉬움** | **⚡⚡ 최고속** | **✅** | **✅ Built-in** |
 
 ### 🎯 Violit을 선택해야 하는 이유
 
@@ -86,9 +86,9 @@ app.write(lambda: f"Hello, {name.value}!")
 - Panel의 **복잡한 Param 시스템** 불필요
 - Streamlit처럼 쉽지만 Panel처럼 강력
 
-#### 4️⃣ **vs NiceGUI**: Python만으로 Native 앱까지
+#### 4️⃣ **vs NiceGUI**: Python만으로 Desktop 앱까지
 - NiceGUI처럼 **실시간 WebSocket 지원**
-- 하지만 Violit은 **30+ 프리미엄 테마**와 **Native Desktop 빌드** 추가
+- 하지만 Violit은 **30+ 프리미엄 테마**와 **Desktop Mode** 추가
 - Vue.js 몰라도 OK, Python만으로 충분
 
 #### 5️⃣ **vs Reflex**: 복잡한 설정 없이 바로 시작
@@ -107,7 +107,7 @@ app.run()  # 끝!
 1. **Zero Configuration**: `pip install violit` → 바로 시작
 2. **Zero Learning Curve**: Streamlit 아시면 5분이면 끝
 3. **Zero Performance Issues**: O(1) 아키텍처로 어떤 규모든 OK
-4. **Native Desktop**: `--native` 한 줄로 .exe/.app 생성
+4. **Desktop Mode**: `--native` 한 줄로 Desktop Mode 실행
 5. **30+ Premium Themes**: 디자이너 없이도 전문가급 UI
 6. **Real-time Broadcasting**: 멀티 유저 실시간 동기화 기본 제공
 
@@ -387,7 +387,7 @@ Violit은 Streamlit의 인기 서드파티 라이브러리 기능들을 **Native
 Streamlit에는 없는 Violit만의 독점 기능:
 - **Broadcasting API**: 실시간 멀티 유저 동기화 (`app.broadcaster`)
 - **Card List**: 동적 리스트 UI 자동 관리 (`app.card_list`)
-- **Native Desktop**: `--native` 플래그로 즉시 데스크탑 앱
+- **Desktop Mode**: `--native` 플래그로 즉시 데스크탑 앱
 - **Hot Reload**: 코드 수정 시 자동 새로고침 (개발 모드)
 - **Animation Modes**: 부드러운 페이지 전환 (`animation_mode='soft'`)
 
@@ -403,7 +403,7 @@ Violit은 현대적인 웹 기술과 파이썬의 강력함을 결합했습니�
 * **State**: Signal-based Reactivity - Solid.js 스타일의 세밀한 반응성
 * **Charts**: Plotly.js - 인터랙티브 차트
 * **Data Grid**: AG-Grid - 엔터프라이즈급 데이터 테이블
-* **Native**: pywebview - Electron 없이 가벼운 데스크탑 앱
+* **Desktop**: pywebview - Electron 없이 가벼운 데스크탑 앱
 
 ### 📦 Zero Dependencies Bloat
 
@@ -465,4 +465,3 @@ This project was developed with the assistance of AI tools (Cursor AI) for code 
 <br>
 <em>Faster than Light, Beautiful as Violet.</em>
 </p>
-

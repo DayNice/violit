@@ -1,5 +1,5 @@
 <p align="center">
-![violit icon](./assets/violit_glare_small.png)
+  <img src="./assets/violit_glare_small.png" alt="violit icon">
 </p>
 
 # 💜 Violit

@@ -454,12 +454,6 @@ MIT License
 
 ---
 
-## 🤖 Development
-
-This project was developed with the assistance of AI tools (Cursor AI) for code generation and development acceleration. All architectural decisions and design choices were made by the project author.
-
----
-
 <p align="center">
 <strong>Made with 💜 by the Violit Team</strong>
 <br>

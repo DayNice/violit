@@ -449,6 +449,8 @@ Unlike other frameworks, Violit:
 
 MIT License
 
+**Violit™ is a trademark of The Violit Team.**
+
 ---
 
 

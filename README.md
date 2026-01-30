@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/violit_glare_small.png" alt="Violit™ Logo" width=80%>
+  <img src="https://raw.githubusercontent.com/violit-dev/violit/refs/heads/main/assets/violit_glare_small.png" alt="Violit™ Logo" width=80%>
 </p>
 
 
@@ -27,8 +27,9 @@ Build applications that react at the speed of light with the most elegant syntax
 *A dashboard built with Violit running in real-time.*
 
 <p align="center">
-  <img src="./assets/demo_show_main_small.gif" alt="Violit Showcase Demo" width=60%>
+  <img src="https://raw.githubusercontent.com/violit-dev/violit/refs/heads/main/assets/demo_show_main_small.gif" alt="Violit Showcase Demo" width=60%>
 </p>
+
 
 
 ---

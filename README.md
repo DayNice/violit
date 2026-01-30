@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/violit_glare_small.png" alt="Violit™ Logo" width=50%>
+  <img src="./assets/violit_glare_small.png" alt="Violit™ Logo" width=80%>
 </p>
 
 

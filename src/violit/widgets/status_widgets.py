@@ -27,7 +27,11 @@ class StatusWidgetsMixin:
         self.alert(content, "primary", "info-circle", cls, **props)
     
     def alert(self, content: Union[str, Callable, State], variant="primary", icon=None, cls: str = "", **props):
-        """Display alert message with Signal support"""
+        """Display alert message
+        
+        Supports: State, ReactiveExpr, callable, or direct value
+        """
+        from ..state import ReactiveExpr
         import html as html_lib
         
         cid = self._get_next_cid("alert")
@@ -37,6 +41,10 @@ class StatusWidgetsMixin:
             if isinstance(content, State):
                 token = rendering_ctx.set(cid)
                 val = content.value
+                rendering_ctx.reset(token)
+            elif isinstance(content, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                val = content()
                 rendering_ctx.reset(token)
             elif callable(content):
                 token = rendering_ctx.set(cid)
@@ -55,15 +63,24 @@ class StatusWidgetsMixin:
         self._register_component(cid, builder)
 
     def toast(self, message: Union[str, Callable, State], icon="info-circle", variant="primary"):
-        """Display toast notification (Signal support via evaluation)"""
+        """Display toast notification
+        
+        Supports: State, ReactiveExpr, callable, or direct value
+        """
+        from ..state import ReactiveExpr
         import json
         
-        if isinstance(message, (State, Callable)):
+        if isinstance(message, (State, ReactiveExpr, Callable)) and callable(message) or isinstance(message, (State, ReactiveExpr)):
             # Special case: dynamic toast label isn't common but for consistency:
             cid = self._get_next_cid("toast_trigger")
             def builder():
                 token = rendering_ctx.set(cid)
-                val = message.value if isinstance(message, State) else message()
+                if isinstance(message, State):
+                    val = message.value
+                elif isinstance(message, ReactiveExpr):
+                    val = message()
+                else:
+                    val = message()
                 rendering_ctx.reset(token)
                 
                 # XSS protection: safely escape with JSON.stringify
@@ -134,7 +151,11 @@ class StatusWidgetsMixin:
                 store['effects'].append(lite_data['effect'])
 
     def progress(self, value=0, text=None, cls: str = "", **props):
-        """Display progress bar with Signal support"""
+        """Display progress bar
+        
+        Supports: State, ReactiveExpr, callable, or direct value
+        """
+        from ..state import ReactiveExpr
         import html as html_lib
         
         cid = self._get_next_cid("progress")
@@ -145,6 +166,10 @@ class StatusWidgetsMixin:
             if isinstance(value, State):
                 token = rendering_ctx.set(cid)
                 val_num = value.value
+                rendering_ctx.reset(token)
+            elif isinstance(value, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                val_num = value()
                 rendering_ctx.reset(token)
             elif callable(value):
                 token = rendering_ctx.set(cid)

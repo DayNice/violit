@@ -13,7 +13,11 @@ class FormWidgetsMixin:
     def button(self, text: Union[str, Callable], on_click: Optional[Callable] = None, 
                variant="primary", icon: str = None, outline: bool = False, 
                loading: bool = False, size: str = "medium", pill: bool = False, cls: str = "", **props):
-        """Display button"""
+        """Display button
+        
+        Supports: State, ReactiveExpr, callable, or direct text
+        """
+        from ..state import State, ReactiveExpr
         cid = self._get_next_cid("btn")
         
         # Extract style OUTSIDE builder (safe for multiple renders)
@@ -22,7 +26,14 @@ class FormWidgetsMixin:
         
         def builder():
             token = rendering_ctx.set(cid)
-            bt = text() if callable(text) else text
+            if isinstance(text, State):
+                bt = text.value
+            elif isinstance(text, ReactiveExpr):
+                bt = text()
+            elif callable(text):
+                bt = text()
+            else:
+                bt = text
             rendering_ctx.reset(token)
             
             attrs_dict = self.engine.click_attrs(cid)

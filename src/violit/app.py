@@ -533,6 +533,61 @@ class App(
                 res.append(builder())
         return res
 
+    # ========== Reactive Helpers ==========
+    def fmt(self, template: str, *args, **kwargs):
+        """
+        Format helper - lambda 대신 사용할 수 있는 포맷 문자열
+        
+        사용 예:
+            app.text(app.fmt("Count: {}", count))
+            app.text(app.fmt("Hello, {}!", name))
+            app.text(app.fmt("{} + {} = {}", a, b, a + b))
+            app.text(app.fmt("Name: {name}, Age: {age}", name=name_state, age=age_state))
+        """
+        from .state import ReactiveExpr, State
+        
+        def evaluate():
+            # args 평가
+            evaluated_args = []
+            for arg in args:
+                if isinstance(arg, State):
+                    evaluated_args.append(arg.value)
+                elif isinstance(arg, ReactiveExpr):
+                    evaluated_args.append(arg())
+                elif callable(arg):
+                    evaluated_args.append(arg())
+                else:
+                    evaluated_args.append(arg)
+            
+            # kwargs 평가
+            evaluated_kwargs = {}
+            for key, val in kwargs.items():
+                if isinstance(val, State):
+                    evaluated_kwargs[key] = val.value
+                elif isinstance(val, ReactiveExpr):
+                    evaluated_kwargs[key] = val()
+                elif callable(val):
+                    evaluated_kwargs[key] = val()
+                else:
+                    evaluated_kwargs[key] = val
+            
+            return template.format(*evaluated_args, **evaluated_kwargs)
+        
+        # 관련 State들 수집
+        states = []
+        for arg in args:
+            if isinstance(arg, State):
+                states.append(arg)
+            elif isinstance(arg, ReactiveExpr):
+                states.extend(arg._states)
+        for val in kwargs.values():
+            if isinstance(val, State):
+                states.append(val)
+            elif isinstance(val, ReactiveExpr):
+                states.extend(val._states)
+        
+        return ReactiveExpr(evaluate, states)
+
     # Theme and settings methods
     def set_theme(self, p):
         """Set theme preset"""

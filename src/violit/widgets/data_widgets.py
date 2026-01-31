@@ -14,7 +14,11 @@ class DataWidgetsMixin:
     
     def dataframe(self, df: Union[pd.DataFrame, Callable, State], height=400, 
                   column_defs=None, grid_options=None, on_cell_clicked=None, cls: str = "", **props):
-        """Display interactive dataframe with AG Grid"""
+        """Display interactive dataframe with AG Grid
+        
+        Supports: State, ReactiveExpr, callable, or direct DataFrame
+        """
+        from ..state import ReactiveExpr
         cid = self._get_next_cid("df")
         
         def action(v):
@@ -26,6 +30,10 @@ class DataWidgetsMixin:
             if isinstance(df, State):
                 token = rendering_ctx.set(cid)
                 current_df = df.value
+                rendering_ctx.reset(token)
+            elif isinstance(df, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                current_df = df()
                 rendering_ctx.reset(token)
             elif callable(df):
                 token = rendering_ctx.set(cid)
@@ -85,13 +93,21 @@ class DataWidgetsMixin:
 
     def table(self, df: Union[pd.DataFrame, Callable, State], 
               styled: bool = False, highlight_row: int = None, title: str = None, cls: str = "", **props):
-        """Display static HTML table (Signal support)"""
+        """Display static HTML table
+        
+        Supports: State, ReactiveExpr, callable, or direct DataFrame
+        """
+        from ..state import ReactiveExpr
         cid = self._get_next_cid("table")
         def builder():
             current_df = df
             if isinstance(df, State):
                 token = rendering_ctx.set(cid)
                 current_df = df.value
+                rendering_ctx.reset(token)
+            elif isinstance(df, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                current_df = df()
                 rendering_ctx.reset(token)
             elif callable(df):
                 token = rendering_ctx.set(cid)
@@ -246,7 +262,11 @@ class DataWidgetsMixin:
     def metric(self, label: str, value: Union[str, int, float, State, Callable], 
                delta: Optional[Union[str, State, Callable]] = None, delta_color: str = "normal",
                icon: str = None, border_color: str = None, help_text: str = None, cls: str = "", **props):
-        """Display metric value with Signal support"""
+        """Display metric value with Signal support
+        
+        Supports: State, ReactiveExpr (count * 2), callable (lambda), or direct value
+        """
+        from ..state import ReactiveExpr
         import html as html_lib
         
         cid = self._get_next_cid("metric")
@@ -257,6 +277,10 @@ class DataWidgetsMixin:
                 token = rendering_ctx.set(cid)
                 curr_val = value.value
                 rendering_ctx.reset(token)
+            elif isinstance(value, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                curr_val = value()
+                rendering_ctx.reset(token)
             elif callable(value):
                 token = rendering_ctx.set(cid)
                 curr_val = value()
@@ -266,6 +290,10 @@ class DataWidgetsMixin:
             if isinstance(delta, State):
                 token = rendering_ctx.set(cid)
                 curr_delta = delta.value
+                rendering_ctx.reset(token)
+            elif isinstance(delta, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                curr_delta = delta()
                 rendering_ctx.reset(token)
             elif callable(delta):
                 token = rendering_ctx.set(cid)
@@ -316,19 +344,41 @@ class DataWidgetsMixin:
         self._register_component(cid, builder)
 
     def json(self, body: Any, expanded=True, cls: str = "", **props):
-        """Display JSON data"""
+        """Display JSON data
+        
+        Supports: State, ReactiveExpr, callable, or direct data
+        """
+        from ..state import ReactiveExpr
         cid = self._get_next_cid("json")
-        json_str = json.dumps(body, indent=2, default=str)
         
-        final_cls = build_cls(f"bg:bg-card b:1|solid|border r:0.5rem p:0.5rem {cls}", **props)
+        def builder():
+            current_body = body
+            if isinstance(body, State):
+                token = rendering_ctx.set(cid)
+                current_body = body.value
+                rendering_ctx.reset(token)
+            elif isinstance(body, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                current_body = body()
+                rendering_ctx.reset(token)
+            elif callable(body):
+                token = rendering_ctx.set(cid)
+                current_body = body()
+                rendering_ctx.reset(token)
+            
+            json_str = json.dumps(current_body, indent=2, default=str)
+            
+            final_cls = build_cls(f"bg:bg-card b:1|solid|border r:0.5rem p:0.5rem {cls}", **props)
+            
+            html = f'''
+            <details {"open" if expanded else ""} class="{final_cls}">
+                <summary class="cursor:pointer font-size:0.875rem color:text-muted">JSON Data</summary>
+                <pre class="m:0.5rem|0|0|0 font-size:0.875rem color:primary">{json_str}</pre>
+            </details>
+            '''
+            return Component("div", id=cid, content=html)
         
-        html = f'''
-        <details {"open" if expanded else ""} class="{final_cls}">
-            <summary class="cursor:pointer font-size:0.875rem color:text-muted">JSON Data</summary>
-            <pre class="m:0.5rem|0|0|0 font-size:0.875rem color:primary">{json_str}</pre>
-        </details>
-        '''
-        return Component("div", id=cid, content=html)
+        self._register_component(cid, builder)
 
     def heatmap(self, data: Union[dict, State, Callable], 
                 start_date=None, end_date=None,
@@ -345,10 +395,15 @@ class DataWidgetsMixin:
                 on_cell_clicked(v)
         
         def builder():
+            from ..state import ReactiveExpr
             current_data = data
             if isinstance(data, State):
                 token = rendering_ctx.set(cid)
                 current_data = data.value
+                rendering_ctx.reset(token)
+            elif isinstance(data, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                current_data = data()
                 rendering_ctx.reset(token)
             elif callable(data):
                 token = rendering_ctx.set(cid)

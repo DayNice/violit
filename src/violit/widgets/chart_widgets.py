@@ -14,7 +14,11 @@ class ChartWidgetsMixin:
     """Chart widgets (line, bar, area, scatter, plotly, pyplot, etc.)"""
     
     def plotly_chart(self, fig: Union[go.Figure, Callable, State], use_container_width=True, render_mode="svg", cls: str = "", **props):
-        """Display Plotly chart with Signal/Lambda support"""
+        """Display Plotly chart
+        
+        Supports: State, ReactiveExpr, callable, or direct Figure
+        """
+        from ..state import ReactiveExpr
         cid = self._get_next_cid("plot")
         
         def builder():
@@ -23,6 +27,10 @@ class ChartWidgetsMixin:
             if isinstance(fig, State):
                 token = rendering_ctx.set(cid)
                 current_fig = fig.value
+                rendering_ctx.reset(token)
+            elif isinstance(fig, ReactiveExpr):
+                token = rendering_ctx.set(cid)
+                current_fig = fig()
                 rendering_ctx.reset(token)
             elif callable(fig):
                 token = rendering_ctx.set(cid)

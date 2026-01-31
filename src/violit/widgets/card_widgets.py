@@ -35,13 +35,24 @@ class CardWidgetsMixin:
         if content is None:
             return CardContext(self, cid, header, footer, attrs_str, hover, accent, variant, cls, **semantic_props)
         else:
+            from ..state import State, ReactiveExpr
             def builder():
                 token = rendering_ctx.set(cid)
                 
                 try:
-                    current_content = content() if callable(content) else content
-                    current_header = header() if callable(header) else header
-                    current_footer = footer() if callable(footer) else footer
+                    # State, ReactiveExpr, callable 모두 지원
+                    def get_value(val):
+                        if isinstance(val, State):
+                            return val.value
+                        elif isinstance(val, ReactiveExpr):
+                            return val()
+                        elif callable(val):
+                            return val()
+                        return val
+                    
+                    current_content = get_value(content)
+                    current_header = get_value(header)
+                    current_footer = get_value(footer)
                     
                     # Base styles
                     base_cls = "w:full"

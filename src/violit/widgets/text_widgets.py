@@ -18,7 +18,7 @@ class TextWidgetsMixin:
             inline: If True, use inline display (default: False)
             **props: Additional semantic props and HTML attributes
         """
-        from ..state import State
+        from ..state import State, ReactiveExpr
         import re
         import json
         import html as html_lib
@@ -51,6 +51,8 @@ class TextWidgetsMixin:
                     
                     if isinstance(arg, State):
                         current_value = arg.value
+                    elif isinstance(arg, ReactiveExpr):
+                        current_value = arg()  # ReactiveExpr 지원
                     elif callable(arg):
                         current_value = arg()
                     
@@ -187,7 +189,7 @@ class TextWidgetsMixin:
 
     def heading(self, text, level: int = 1, divider: bool = False, gradient: bool = None, align: str = None, cls: str = "", **kwargs):
         """Display heading (h1-h6)"""
-        from ..state import State
+        from ..state import State, ReactiveExpr
         import html as html_lib
         
         cid = self._get_next_cid("heading")
@@ -195,6 +197,8 @@ class TextWidgetsMixin:
             token = rendering_ctx.set(cid)
             if isinstance(text, State):
                 content = text.value
+            elif isinstance(text, ReactiveExpr):
+                content = text()
             elif callable(text):
                 content = text()
             else:
@@ -256,14 +260,21 @@ class TextWidgetsMixin:
         """Display text paragraph
         
         Args:
-            content: Text content (can be State or callable)
+            content: Text content (can be State, ReactiveExpr, callable, or value)
             size: Text size ("small", "medium", "large", or custom like "3rem")
             muted: If True, use muted color
             align: Text alignment ("left", "center", "right")
             cls: Additional Master CSS classes
             **kwargs: Additional semantic props (including style)
+        
+        Examples:
+            app.text(count)                    # State 직접
+            app.text(count * 2)                # ReactiveExpr (연산자)
+            app.text("Count: " + count)        # ReactiveExpr (문자열 연결)
+            app.text(app.fmt("Count: {}", count))  # 포맷 헬퍼
+            app.text(lambda: count.value * 2)  # lambda (기존 방식)
         """
-        from ..state import State
+        from ..state import State, ReactiveExpr
         
         cid = self._get_next_cid("text")
         
@@ -275,7 +286,15 @@ class TextWidgetsMixin:
         
         def builder():
             token = rendering_ctx.set(cid)
-            val = content.value if isinstance(content, State) else (content() if callable(content) else content)
+            # State, ReactiveExpr, callable, 일반값 모두 지원
+            if isinstance(content, State):
+                val = content.value
+            elif isinstance(content, ReactiveExpr):
+                val = content()
+            elif callable(content):
+                val = content()
+            else:
+                val = content
             rendering_ctx.reset(token)
             
             # Build inline style for reliable rendering
@@ -419,9 +438,10 @@ class TextWidgetsMixin:
                 lines = escaped_code.split('\n')
                 numbered_lines = []
                 for i, line in enumerate(lines, 1):
-                    numbered_lines.append(f'<span class="line-num">{i}</span>{line}')
+                    # 라인 번호 뒤에 공백 추가 (탭 문자 사용)
+                    numbered_lines.append(f'<span class="line-num">{i:>3}</span>    {line}')
                 escaped_code = '\n'.join(numbered_lines)
-                line_num_style = '.line-num { display: inline-block; width: 2.5rem; text-align: right; margin-right: 1rem; color: #6b7280; user-select: none; }'
+                line_num_style = '.line-num { color: #6b7280; user-select: none; }'
             else:
                 line_num_style = ''
             
@@ -429,9 +449,11 @@ class TextWidgetsMixin:
             
             copy_btn_html = ''
             if copy_button:
-                raw_code = html_lib.escape(str(code_text).replace('"', '&quot;'))
+                # 원본 코드 사용 (escape 하지 않음), 따옴표만 HTML attribute용으로 변환
+                raw_code = str(code_text).replace('"', '&quot;')
                 copy_btn_html = f'''<sl-copy-button value="{raw_code}" 
-                    class="abs top:0.5rem right:0.5rem" style="--sl-color-primary-600: var(--sl-color-neutral-400);">
+                    class="abs top:0.5rem right:0.5rem" 
+                    style="--sl-color-primary-600: #e9d5ff; --sl-color-neutral-600: #c4b5fd; color: #e9d5ff;">
                 </sl-copy-button>'''
             
             final_cls = build_cls(cls, **props)
@@ -473,14 +495,20 @@ class TextWidgetsMixin:
                     .code-showcase-{cid} .code-dot.green {{ background: #27c93f; }}
                     
                     .code-showcase-{cid} .code-title {{
-                        position: absolute; top: 12px; right: 20px; color: #666; font-family: sans-serif; font-size: 0.8rem; z-index: 1;
+                        position: absolute; top: 12px; left: 50%; transform: translateX(-50%); color: #888; font-family: monospace; font-size: 0.85rem; z-index: 1;
                     }}
                     
                     .code-showcase-{cid} pre {{
                         margin-top: 1.5rem; background: transparent !important; border: none !important; padding: 0 !important;
                     }}
                     .code-showcase-{cid} code {{
-                        color: #d4d4d4 !important; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.95rem; line-height: 1.8;
+                        background: transparent !important; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.95rem; line-height: 1.4;
+                    }}
+                    .code-showcase-{cid} code * {{
+                        background: transparent !important;
+                    }}
+                    .code-showcase-{cid} .hljs {{
+                        background: transparent !important;
                     }}
                     {line_num_style}
                     </style>

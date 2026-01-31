@@ -2,49 +2,42 @@ from typing import Optional, Union, Callable
 from ..component import Component
 from ..context import fragment_ctx
 from ..state import get_session_store
+from ..style_utils import build_cls
 
 class ChatWidgetsMixin:
     """Chat-related widgets"""
     
-    def chat_message(self, name: str, avatar: Optional[str] = None):
+    def chat_message(self, name: str, avatar: Optional[str] = None, cls: str = "", **props):
         """
         Insert a chat message container.
-        
-        Args:
-            name (str): The name of the author (e.g. "user", "assistant").
-            avatar (str, optional): The avatar image or emoji.
         """
         cid = self._get_next_cid("chat_message")
         
         class ChatMessageContext:
-            def __init__(self, app, message_id, name, avatar):
+            def __init__(self, app, message_id, name, avatar, cls, props):
                 self.app = app
                 self.message_id = message_id
                 self.name = name
                 self.avatar = avatar
+                self.cls = cls
+                self.props = props
                 self.token = None
                 
             def __enter__(self):
-                # Register builder
                 def builder():
                     store = get_session_store()
                     
-                    # Collected content
                     htmls = []
-                    # Check static
                     for cid_child, b in self.app.static_fragment_components.get(self.message_id, []):
                         htmls.append(b().render())
-                    # Check session
                     for cid_child, b in store['fragment_components'].get(self.message_id, []):
                         htmls.append(b().render())
                     
                     inner_html = "".join(htmls)
                     
-                    # determine avatar and background
                     bg_color = "transparent"
                     avatar_content = ""
                     
-                    # Icons handling
                     if self.avatar:
                         if self.avatar.startswith("http") or self.avatar.startswith("data:"):
                             avatar_content = f'<img src="{self.avatar}" style="width:32px;height:32px;border-radius:4px;object-fit:cover;">'
@@ -62,12 +55,18 @@ class ChatWidgetsMixin:
                             avatar_content = f'<div style="width:32px;height:32px;border-radius:4px;background:#9CA3AF;color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;">{initial}</div>'
                             bg_color = "rgba(0,0,0,0.02)"
 
+                    # Use Master CSS for layout, but keep specific avatar/bg logic inline or map it
+                    # We can pass bg_color via style attribute if needed, or map to Master CSS if it's a standard color
+                    # For dynamic bg colors based on role, inline style is safer/easier here.
+                    
+                    final_cls = build_cls(f"flex gap:16px mb:16px p:16px r:8 {self.cls}", **self.props)
+                    
                     html = f'''
-                    <div class="chat-message" style="display:flex; gap:16px; margin-bottom:16px; padding:16px; border-radius:8px; background:{bg_color};">
-                        <div class="chat-avatar" style="flex-shrink:0;">
+                    <div class="chat-message {final_cls}" style="background:{bg_color};">
+                        <div class="chat-avatar flex-shrink:0">
                            {avatar_content}
                         </div>
-                        <div class="chat-content" style="flex:1; min-width:0; overflow-wrap:break-word;">
+                        <div class="chat-content flex:1 min-w:0 overflow-wrap:break-word">
                             {inner_html}
                         </div>
                     </div>
@@ -86,21 +85,15 @@ class ChatWidgetsMixin:
             def __getattr__(self, name):
                 return getattr(self.app, name)
                 
-        return ChatMessageContext(self, cid, name, avatar)
+        return ChatMessageContext(self, cid, name, avatar, cls, props)
 
-    def chat_input(self, placeholder: str = "Your message", on_submit: Optional[Callable[[str], None]] = None, auto_scroll: bool = True):
+    def chat_input(self, placeholder: str = "Your message", on_submit: Optional[Callable[[str], None]] = None, auto_scroll: bool = True, cls: str = "", **props):
         """
         Display a chat input widget at the bottom of the page.
-        
-        Args:
-            placeholder (str): Placeholder text.
-            on_submit (Callable[[str], None]): Callback function to run when message is sent.
-            auto_scroll (bool): If True, automatically scroll to bottom after rendering.
         """
         cid = self._get_next_cid("chat_input")
         store = get_session_store()
         
-        # Register action handler
         def handler(val):
             if on_submit:
                 on_submit(val)
@@ -108,12 +101,16 @@ class ChatWidgetsMixin:
         self.static_actions[cid] = handler
             
         def builder():
-            # Fixed bottom input
-            # We use window.lastActiveChatInput to restore focus after re-render/replacement
             scroll_script = "window.scrollTo(0, document.body.scrollHeight);" if auto_scroll else ""
             
+            final_cls = build_cls(cls, **props)
+            
+            # Using Master CSS for layout
+            # Fixed positioning needs careful handling with Master CSS if we want to mix it
+            # We keep the complex style logic but allow adding classes
+            
             html = f'''
-            <div class="chat-input-container" style="
+            <div class="chat-input-container {final_cls}" style="
                 position: fixed; 
                 bottom: 0; 
                 left: 300px;
@@ -138,16 +135,7 @@ class ChatWidgetsMixin:
                     gap: 8px;
                     pointer-events: auto;
                 ">
-                    <input type="text" id="input_{cid}" class="chat-input-box" placeholder="{placeholder}" 
-                        style="
-                            flex: 1; 
-                            border: none; 
-                            background: transparent; 
-                            padding: 8px; 
-                            font-size: 1rem; 
-                            color: var(--sl-text); 
-                            outline: none;
-                        "
+                    <input type="text" id="input_{cid}" class="chat-input-box flex:1 b:none bg:transparent p:8px font-size:1rem color:text outline:none" placeholder="{placeholder}" 
                         onkeydown="if(event.key==='Enter'){{ 
                             window.chatInputWasActive = true;
                             {f"sendAction('{cid}', this.value);" if self.mode == 'ws' else f"htmx.ajax('POST', '/action/{cid}', {{values: {{value: this.value}}, swap: 'none'}});"}
@@ -167,7 +155,6 @@ class ChatWidgetsMixin:
             <!-- Spacer -->
             <div style="height: 100px;"></div>
             <script>
-                // Auto-scroll if enabled
                 if ("{auto_scroll}" === "True") {{
                     setTimeout(() => {{ 
                         window.scrollTo({{
@@ -177,10 +164,8 @@ class ChatWidgetsMixin:
                     }}, 100);
                 }}
 
-                // Restore focus if a chat input was just used
                 if (window.chatInputWasActive) {{
                     setTimeout(() => {{
-                        // Find ANY chat input box
                         const el = document.querySelector('.chat-input-box');
                         if (el) {{
                             el.focus();
@@ -194,29 +179,5 @@ class ChatWidgetsMixin:
             
         self._register_component(cid, builder)
         
-        # Return the value just submitted, or None
-        # We need to check if this specific component triggered the action in this cycle
-        # This is tricky without a dedicated 'current_action_trigger' context.
-        # In `App.action`, it calls the handler. 
-        # If we use `actions` dict in store, it persists. 
-        # We want `chat_input` to return the value ONLY when it was just submitted.
-        
-        # Hack: Check if this cid matches the latest action if we had that info.
-        # Alternative: The user code uses `if prompt := app.chat_input():`.
-        # This implies standard rerun logic.
-        # If the frontend sent an action for `cid`, `store['actions'][cid]` will be set.
-        # We should probably clear it after reading to behave like a one-time event?
-        # But if we clear it here, and the script reruns multiple times or checks it multiple times? 
-        # Usually it's read once per run.
-        
         val = store['actions'].get(cid)
-        
-        # To prevent stale values on subsequent non-related runs (e.g. other buttons),
-        # we ideally need to know 'who' triggered the run.
-        # But for now, returning what's in store is the best approximation.
-        # If another button is clicked, `store['actions']` might still have this cid's old value 
-        # if we don't clear it. 
-        # However, `store['actions']` is persistent in the current `app.py` logic?
-        # Let's check app.py action handler. 
-        
         return val

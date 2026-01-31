@@ -7,6 +7,7 @@ import json
 from ..component import Component
 from ..context import rendering_ctx, layout_ctx
 from ..state import State
+from ..style_utils import build_cls
 
 
 class UploadedFile(io.BytesIO):
@@ -35,16 +36,16 @@ class UploadedFile(io.BytesIO):
 
 class InputWidgetsMixin:
     
-    def text_input(self, label, value="", key=None, on_change=None, **props):
+    def text_input(self, label, value="", key=None, on_change=None, cls: str = "", **props):
         """Single-line text input"""
-        return self._input_component("input", "sl-input", label, value, on_change, key, **props)
+        return self._input_component("input", "sl-input", label, value, on_change, key, cls=cls, **props)
 
-    def slider(self, label, min_value=0, max_value=100, value=None, step=1, key=None, on_change=None, **props):
+    def slider(self, label, min_value=0, max_value=100, value=None, step=1, key=None, on_change=None, cls: str = "", **props):
         """Slider widget"""
         if value is None: value = min_value
-        return self._input_component("slider", "sl-range", label, value, on_change, key, min=min_value, max=max_value, step=step, **props)
+        return self._input_component("slider", "sl-range", label, value, on_change, key, min=min_value, max=max_value, step=step, cls=cls, **props)
 
-    def checkbox(self, label, value=False, key=None, on_change=None, **props):
+    def checkbox(self, label, value=False, key=None, on_change=None, cls: str = "", **props):
         """Checkbox widget"""
         cid = self._get_next_cid("checkbox")
         
@@ -57,19 +58,28 @@ class InputWidgetsMixin:
             if on_change: on_change(real_val)
         
         def builder():
-            # Subscribe to own state - client-side will handle smart updates
             token = rendering_ctx.set(cid)
             cv = s.value
             rendering_ctx.reset(token)
             
             checked_attr = 'checked' if cv else ''
-            props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
+            
+            # Separate semantic props from HTML attributes
+            semantic_props = {}
+            html_attrs = {}
+            for k, v in props.items():
+                if k in ['p', 'm', 'bg', 'color'] or k.startswith(('p:', 'm:', 'bg:', 'color:')): # Simple heuristic
+                    semantic_props[k] = v
+                else:
+                    html_attrs[k] = v
+
+            final_cls = build_cls(cls, **semantic_props)
+            props_str = ' '.join(f'{k}="{v}"' for k, v in html_attrs.items() if v is not None and v is not False)
             
             if self.mode == 'lite':
                 attrs_str = f'hx-post="/action/{cid}" hx-trigger="sl-change" hx-swap="none" hx-vals="js:{{value: event.target.checked}}"'
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs_str = ""
                 listener_script = f'''
                 <script>
@@ -85,12 +95,12 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            html = f'<sl-checkbox id="{cid}" {checked_attr} {attrs_str} {props_str}>{label}</sl-checkbox>{listener_script}'
+            html = f'<sl-checkbox id="{cid}" {checked_attr} {attrs_str} class="{final_cls}" {props_str}>{label}</sl-checkbox>{listener_script}'
             return Component(None, id=cid, content=html)
         self._register_component(cid, builder, action=action)
         return s
 
-    def radio(self, label, options, index=0, key=None, on_change=None, **props):
+    def radio(self, label, options, index=0, key=None, on_change=None, cls: str = "", **props):
         """Radio button group"""
         cid = self._get_next_cid("radio_group")
         
@@ -116,7 +126,6 @@ class InputWidgetsMixin:
                 attrs_str = f'hx-post="/action/{cid}" hx-trigger="sl-change" hx-swap="none" name="value"'
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs_str = ""
                 listener_script = f'''
                 <script>
@@ -132,15 +141,19 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
-            html = f'<sl-radio-group id="{cid}" label="{label}" value="{cv}" {attrs_str} {props_str}>{opts_html}</sl-radio-group>{listener_script}'
+            final_cls = build_cls(cls, **props)
+            # Filter props for HTML attributes? For simplicity, assume props are mostly semantic/style in hybrid mode.
+            # But radio-group might accept other props.
+            # Let's just pass cls to class attribute.
+            
+            html = f'<sl-radio-group id="{cid}" label="{label}" value="{cv}" {attrs_str} class="{final_cls}">{opts_html}</sl-radio-group>{listener_script}'
             
             return Component(None, id=cid, content=html)
             
         self._register_component(cid, builder, action=action)
         return s
 
-    def selectbox(self, label, options, index=0, key=None, on_change=None, **props):
+    def selectbox(self, label, options, index=0, key=None, on_change=None, cls: str = "", **props):
         """Single select dropdown"""
         cid = self._get_next_cid("select")
         
@@ -166,7 +179,6 @@ class InputWidgetsMixin:
                 attrs = {"hx-post": f"/action/{cid}", "hx-trigger": "sl-change", "hx-swap": "none", "name": "value"}
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs = {}
                 listener_script = f'''
                 <script>
@@ -182,12 +194,12 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            select_html = f'<sl-select id="{cid}" label="{label}" value="{cv}"'
-            for k, v in {**attrs, **props}.items():
-                if v is True:
-                    select_html += f' {k}'
-                elif v is not False and v is not None:
-                    select_html += f' {k}="{v}"'
+            final_cls = build_cls(cls, **props)
+            
+            select_html = f'<sl-select id="{cid}" label="{label}" value="{cv}" class="{final_cls}"'
+            for k, v in attrs.items():
+                if v is True: select_html += f' {k}'
+                elif v is not False and v is not None: select_html += f' {k}="{v}"'
             select_html += f'>{opts_html}</sl-select>{listener_script}'
             
             return Component(None, id=cid, content=select_html)
@@ -195,7 +207,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def multiselect(self, label, options, default=None, key=None, on_change=None, **props):
+    def multiselect(self, label, options, default=None, key=None, on_change=None, cls: str = "", **props):
         """Multi-select dropdown"""
         cid = self._get_next_cid("multiselect")
         
@@ -227,11 +239,11 @@ class InputWidgetsMixin:
             if self.mode == 'ws':
                 attrs = {"on_sl_change": f"window.sendAction('{cid}', this.value)"}
 
-            return Component("sl-select", id=cid, label=label, content=opts_html, multiple=True, clearable=True, **attrs)
+            final_cls = build_cls(cls, **props)
+            return Component("sl-select", id=cid, label=label, content=opts_html, multiple=True, clearable=True, class_=final_cls, **attrs)
         
         self._register_component(cid, builder, action=action)
         
-        # Add initialization script for lite mode
         if self.mode == 'lite':
             init_script_cid = f"{cid}_init"
             def script_builder():
@@ -272,7 +284,7 @@ class InputWidgetsMixin:
         
         return s
 
-    def text_area(self, label, value="", height=None, key=None, on_change=None, **props):
+    def text_area(self, label, value="", height=None, key=None, on_change=None, cls: str = "", **props):
         """Multi-line text input"""
         cid = self._get_next_cid("textarea")
         
@@ -292,7 +304,6 @@ class InputWidgetsMixin:
                 attrs = {"hx-post": f"/action/{cid}", "hx-trigger": "sl-input delay:50ms", "hx-swap": "none", "name": "value"}
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs = {}
                 listener_script = f'''
                 <script>
@@ -309,9 +320,11 @@ class InputWidgetsMixin:
                 '''
             
             textarea_props = {"rows": height or 3, "resize": "auto"}
-            # Remove attrs from args to Component and inject script after
-            html = f'<sl-textarea id="{cid}" label="{label}" value="{cv}"'
-            for k, v in {**attrs, **textarea_props, **props}.items():
+            
+            final_cls = build_cls(cls, **props)
+            
+            html = f'<sl-textarea id="{cid}" label="{label}" value="{cv}" class="{final_cls}"'
+            for k, v in {**attrs, **textarea_props}.items():
                 if v is True: html += f' {k}'
                 elif v is not False and v is not None: html += f' {k}="{v}"'
             html += f'></sl-textarea>{listener_script}'
@@ -321,7 +334,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def number_input(self, label, value=0, min_value=None, max_value=None, step=1, key=None, on_change=None, **props):
+    def number_input(self, label, value=0, min_value=None, max_value=None, step=1, key=None, on_change=None, cls: str = "", **props):
         """Numeric input"""
         cid = self._get_next_cid("number")
         
@@ -345,7 +358,6 @@ class InputWidgetsMixin:
                 attrs = {"hx-post": f"/action/{cid}", "hx-trigger": "sl-input delay:50ms", "hx-swap": "none", "name": "value"}
                 listener_script = ""
             else:
-                # WS mode: use addEventListener
                 attrs = {}
                 listener_script = f'''
                 <script>
@@ -366,8 +378,10 @@ class InputWidgetsMixin:
             if max_value is not None: num_props["max"] = max_value
             if step is not None: num_props["step"] = step
             
-            html = f'<sl-input id="{cid}" label="{label}" value="{cv}"'
-            for k, v in {**attrs, **num_props, **props}.items():
+            final_cls = build_cls(cls, **props)
+            
+            html = f'<sl-input id="{cid}" label="{label}" value="{cv}" class="{final_cls}"'
+            for k, v in {**attrs, **num_props}.items():
                 if v is True: html += f' {k}'
                 elif v is not False and v is not None: html += f' {k}="{v}"'
             html += f'></sl-input>{listener_script}'
@@ -377,7 +391,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def file_uploader(self, label, accept=None, multiple=False, key=None, on_change=None, help=None, **props):
+    def file_uploader(self, label, accept=None, multiple=False, key=None, on_change=None, help=None, cls: str = "", **props):
         """File upload widget"""
         cid = self._get_next_cid("file")
         
@@ -387,7 +401,6 @@ class InputWidgetsMixin:
         def action(v):
             if v:
                 try:
-                    # v might be a JSON string if from Lite mode
                     if isinstance(v, str) and v.startswith('{'):
                          try:
                              data = json.loads(v)
@@ -398,13 +411,11 @@ class InputWidgetsMixin:
                     
                     if isinstance(data, dict):
                         if "content" in data:
-                            # Single file
                             uf = UploadedFile(data.get("name"), data.get("type"), data.get("size"), data.get("content"))
                             s.set(uf)
                             if on_change: on_change(uf)
                             return
                         elif "files" in data:
-                             # Multiple files
                              files = []
                              for f_data in data["files"]:
                                  files.append(UploadedFile(f_data.get("name"), f_data.get("type"), f_data.get("size"), f_data.get("content")))
@@ -422,7 +433,6 @@ class InputWidgetsMixin:
             cv = s.value
             rendering_ctx.reset(token)
             
-            # Build file info display
             if cv:
                 if isinstance(cv, list):
                     file_info = f"✅ {len(cv)} file(s) uploaded"
@@ -434,15 +444,17 @@ class InputWidgetsMixin:
                 file_info = ""
             
             accept_str = accept if accept else "*"
-            help_html = f'<div style="font-size:0.75rem;color:var(--sl-text-muted);margin-top:0.25rem;">{help}</div>' if help else ""
+            help_html = f'<div class="font-size:0.75rem color:text-muted mt:0.25rem">{help}</div>' if help else ""
+            
+            final_cls = build_cls(f"mb:1rem {cls}", **props)
             
             html = f'''
-            <div class="file-uploader" style="margin-bottom:1rem;">
-                <label style="display:block;margin-bottom:0.5rem;font-weight:500;color:var(--sl-text);">{label}</label>
+            <div class="file-uploader {final_cls}">
+                <label class="d:block mb:0.5rem fw:500 color:text">{label}</label>
                 <input type="file" id="{cid}_input" accept="{accept_str}" {'multiple' if multiple else ''} 
-                       style="display:block;padding:0.5rem;border:1px solid var(--sl-border);border-radius:0.25rem;background:var(--sl-bg-card);color:var(--sl-text);width:100%;font-family:inherit;cursor:pointer;" />
+                       class="d:block p:0.5rem b:1|solid|border r:0.25rem bg:bg-card color:text w:full font:inherit cursor:pointer" />
                 {help_html}
-                <div id="{cid}_info" style="margin-top:0.5rem;font-size:0.875rem;color:var(--sl-text-muted);">{file_info}</div>
+                <div id="{cid}_info" class="mt:0.5rem font-size:0.875rem color:text-muted">{file_info}</div>
             </div>
             <script>
             (function() {{
@@ -484,7 +496,6 @@ class InputWidgetsMixin:
                                     payload = results[0];
                                 }}
                                 
-                                // Update UI immediately
                                 if ({'true' if multiple else 'false'}) {{
                                     infoDiv.textContent = '✅ ' + results.length + ' file(s) uploaded';
                                 }} else {{
@@ -493,12 +504,9 @@ class InputWidgetsMixin:
                                     infoDiv.textContent = '✅ ' + file.name + ' (' + sizeKB + ' KB)';
                                 }}
                                 
-                                // Send to backend
                                 if (window.sendAction) {{
-                                    // WebSocket mode
                                     window.sendAction('{cid}', payload);
                                 }} else if (window.htmx) {{
-                                    // HTMX mode
                                     htmx.ajax('POST', '/action/{cid}', {{
                                         values: {{ value: JSON.stringify(payload) }},
                                         swap: 'none'
@@ -519,7 +527,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def toggle(self, label, value=False, key=None, on_change=None, **props):
+    def toggle(self, label, value=False, key=None, on_change=None, cls: str = "", **props):
         """Toggle switch widget"""
         cid = self._get_next_cid("toggle")
         
@@ -532,19 +540,16 @@ class InputWidgetsMixin:
             if on_change: on_change(real_val)
         
         def builder():
-            # Subscribe to own state - client-side will handle smart updates
             token = rendering_ctx.set(cid)
             cv = s.value
             rendering_ctx.reset(token)
             
             checked_attr = 'checked' if cv else ''
-            props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
             
             if self.mode == 'lite':
                 attrs_str = f'hx-post="/action/{cid}" hx-trigger="sl-change" hx-swap="none" hx-vals="js:{{value: event.target.checked}}"'
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs_str = ""
                 listener_script = f'''
                 <script>
@@ -560,12 +565,13 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            html = f'<sl-switch id="{cid}" {checked_attr} {attrs_str} {props_str}>{label}</sl-switch>{listener_script}'
+            final_cls = build_cls(cls, **props)
+            html = f'<sl-switch id="{cid}" {checked_attr} {attrs_str} class="{final_cls}">{label}</sl-switch>{listener_script}'
             return Component(None, id=cid, content=html)
         self._register_component(cid, builder, action=action)
         return s
 
-    def color_picker(self, label="Pick a color", value="#000000", key=None, on_change=None, **props):
+    def color_picker(self, label="Pick a color", value="#000000", key=None, on_change=None, cls: str = "", **props):
         """Color picker widget"""
         cid = self._get_next_cid("color")
         
@@ -586,12 +592,13 @@ class InputWidgetsMixin:
             else:
                 attrs = {"on_sl_change": f"window.sendAction('{cid}', this.value)"}
             
-            return Component("sl-color-picker", id=cid, label=label, value=cv, **attrs, **props)
+            final_cls = build_cls(cls, **props)
+            return Component("sl-color-picker", id=cid, label=label, value=cv, class_=final_cls, **attrs)
         
         self._register_component(cid, builder, action=action)
         return s
 
-    def date_input(self, label="Select date", value=None, key=None, on_change=None, **props):
+    def date_input(self, label="Select date", value=None, key=None, on_change=None, cls: str = "", **props):
         """Date picker widget"""
         import datetime
         cid = self._get_next_cid("date")
@@ -614,11 +621,13 @@ class InputWidgetsMixin:
             else:
                 attrs = {"onchange": f"window.sendAction('{cid}', this.value)"}
             
+            final_cls = build_cls(f"mb:0.5rem {cls}", **props)
+            
             html = f'''
-            <div style="margin-bottom: 0.5rem;">
-                <label style="display:block;margin-bottom:0.5rem;font-weight:500;color:var(--sl-text);">{label}</label>
+            <div class="{final_cls}">
+                <label class="d:block mb:0.5rem fw:500 color:text">{label}</label>
                 <input type="date" id="{cid}_input" value="{cv}" 
-                       style="width:100%;padding:0.5rem;border:1px solid var(--sl-border);border-radius:0.5rem;background:var(--sl-bg-card);color:var(--sl-text);font-family:inherit;"
+                       class="w:full p:0.5rem b:1|solid|border r:0.5rem bg:bg-card color:text font:inherit"
                        {' '.join(f'{k}="{v}"' for k,v in attrs.items())} />
             </div>
             '''
@@ -627,7 +636,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def time_input(self, label="Select time", value=None, key=None, on_change=None, **props):
+    def time_input(self, label="Select time", value=None, key=None, on_change=None, cls: str = "", **props):
         """Time picker widget"""
         import datetime
         cid = self._get_next_cid("time")
@@ -650,11 +659,13 @@ class InputWidgetsMixin:
             else:
                 attrs = {"onchange": f"window.sendAction('{cid}', this.value)"}
             
+            final_cls = build_cls(f"mb:0.5rem {cls}", **props)
+            
             html = f'''
-            <div style="margin-bottom: 0.5rem;">
-                <label style="display:block;margin-bottom:0.5rem;font-weight:500;color:var(--sl-text);">{label}</label>
+            <div class="{final_cls}">
+                <label class="d:block mb:0.5rem fw:500 color:text">{label}</label>
                 <input type="time" id="{cid}_input" value="{cv}" 
-                       style="width:100%;padding:0.5rem;border:1px solid var(--sl-border);border-radius:0.5rem;background:var(--sl-bg-card);color:var(--sl-text);font-family:inherit;"
+                       class="w:full p:0.5rem b:1|solid|border r:0.5rem bg:bg-card color:text font:inherit"
                        {' '.join(f'{k}="{v}"' for k,v in attrs.items())} />
             </div>
             '''
@@ -663,7 +674,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def datetime_input(self, label="Select date and time", value=None, key=None, on_change=None, **props):
+    def datetime_input(self, label="Select date and time", value=None, key=None, on_change=None, cls: str = "", **props):
         """DateTime picker widget"""
         import datetime
         cid = self._get_next_cid("datetime")
@@ -686,11 +697,13 @@ class InputWidgetsMixin:
             else:
                 attrs = {"onchange": f"window.sendAction('{cid}', this.value)"}
             
+            final_cls = build_cls(f"mb:0.5rem {cls}", **props)
+            
             html = f'''
-            <div style="margin-bottom: 0.5rem;">
-                <label style="display:block;margin-bottom:0.5rem;font-weight:500;color:var(--sl-text);">{label}</label>
+            <div class="{final_cls}">
+                <label class="d:block mb:0.5rem fw:500 color:text">{label}</label>
                 <input type="datetime-local" id="{cid}_input" value="{cv}" 
-                       style="width:100%;padding:0.5rem;border:1px solid var(--sl-border);border-radius:0.5rem;background:var(--sl-bg-card);color:var(--sl-text);font-family:inherit;"
+                       class="w:full p:0.5rem b:1|solid|border r:0.5rem bg:bg-card color:text font:inherit"
                        {' '.join(f'{k}="{v}"' for k,v in attrs.items())} />
             </div>
             '''
@@ -699,7 +712,7 @@ class InputWidgetsMixin:
         self._register_component(cid, builder, action=action)
         return s
 
-    def _input_component(self, type_name, tag_name, label, value, on_change, key=None, **props):
+    def _input_component(self, type_name, tag_name, label, value, on_change, key=None, cls: str = "", **props):
         """Generic input component builder"""
         cid = self._get_next_cid(type_name)
         
@@ -721,7 +734,6 @@ class InputWidgetsMixin:
                 attrs_str = f'hx-post="/action/{cid}" hx-trigger="sl-change" hx-swap="none" name="value"'
                 listener_script = ""
             else:
-                # WS mode: use addEventListener for Shoelace custom events
                 attrs_str = ""
                 listener_script = f'''
                 <script>
@@ -737,8 +749,19 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
-            html = f'<{tag_name} id="{cid}" label="{label}" value="{cv}" {attrs_str} {props_str}></{tag_name}>{listener_script}'
+            # Separate semantic props from HTML attributes
+            semantic_props = {}
+            html_attrs = {}
+            for k, v in props.items():
+                if k in ['p', 'm', 'bg', 'color'] or k.startswith(('p:', 'm:', 'bg:', 'color:')):
+                    semantic_props[k] = v
+                else:
+                    html_attrs[k] = v
+
+            final_cls = build_cls(cls, **semantic_props)
+            props_str = ' '.join(f'{k}="{v}"' for k, v in html_attrs.items() if v is not None and v is not False)
+            
+            html = f'<{tag_name} id="{cid}" label="{label}" value="{cv}" {attrs_str} class="{final_cls}" {props_str}></{tag_name}>{listener_script}'
             
             return Component(None, id=cid, content=html)
         self._register_component(cid, builder, action=action)

@@ -6,23 +6,22 @@ import pandas as pd
 from ..component import Component
 from ..context import rendering_ctx
 from ..state import State
+from ..style_utils import build_cls
 
 
 class DataWidgetsMixin:
     """Data display widgets (dataframe, table, data_editor, metric, json)"""
     
     def dataframe(self, df: Union[pd.DataFrame, Callable, State], height=400, 
-                  column_defs=None, grid_options=None, on_cell_clicked=None, **props):
+                  column_defs=None, grid_options=None, on_cell_clicked=None, cls: str = "", **props):
         """Display interactive dataframe with AG Grid"""
         cid = self._get_next_cid("df")
         
         def action(v):
-            """Handle cell click events"""
             if on_cell_clicked and callable(on_cell_clicked):
                 on_cell_clicked(v)
         
         def builder():
-            # Handle Signal
             current_df = df
             if isinstance(df, State):
                 token = rendering_ctx.set(cid)
@@ -34,22 +33,18 @@ class DataWidgetsMixin:
                 rendering_ctx.reset(token)
                 
             if not isinstance(current_df, pd.DataFrame):
-                # Fallback or try to convert
                 try: current_df = pd.DataFrame(current_df)
                 except: return Component("div", id=cid, content="Invalid data format")
 
             data = current_df.to_dict('records')
             
-            # Use custom column_defs or generate defaults
             if column_defs:
                 cols = column_defs
             else:
                 cols = [{"field": c, "sortable": True, "filter": True} for c in current_df.columns]
             
-            # Merge grid_options
             extra_options = grid_options or {}
             
-            # Add cell click handler if provided
             cell_click_handler = ""
             if on_cell_clicked:
                 cell_click_handler = f'''
@@ -64,8 +59,10 @@ class DataWidgetsMixin:
                 }},
                 '''
             
+            final_cls = build_cls(f"ag-theme-alpine-dark w:full {cls}", **props)
+            
             html = f'''
-            <div id="{cid}" style="height: {height}px; width: 100%;" class="ag-theme-alpine-dark"></div>
+            <div id="{cid}" style="height: {height}px;" class="{final_cls}"></div>
             <script>(function(){{
                 const opt = {{ 
                     columnDefs: {json.dumps(cols, default=str)}, 
@@ -87,18 +84,10 @@ class DataWidgetsMixin:
         self._register_component(cid, builder, action=action if on_cell_clicked else None)
 
     def table(self, df: Union[pd.DataFrame, Callable, State], 
-              styled: bool = False, highlight_row: int = None, title: str = None, **props):
-        """Display static HTML table (Signal support)
-        
-        Args:
-            df: DataFrame or callable/State
-            styled: Use premium styled table with rounded corners and header gradient
-            highlight_row: Row index to highlight (0-based)
-            title: Optional table title (only for styled mode)
-        """
+              styled: bool = False, highlight_row: int = None, title: str = None, cls: str = "", **props):
+        """Display static HTML table (Signal support)"""
         cid = self._get_next_cid("table")
         def builder():
-            # Handle Signal
             current_df = df
             if isinstance(df, State):
                 token = rendering_ctx.set(cid)
@@ -116,7 +105,7 @@ class DataWidgetsMixin:
             if styled:
                 # Premium styled table
                 headers_html = ''.join(
-                    f'<th style="padding: 1rem; text-align: center; border-bottom: 2px solid rgba(139, 92, 246, 0.3);">{col}</th>' 
+                    f'<th class="p:1rem text:center bb:2|solid|rgba(139,92,246,0.3)">{col}</th>' 
                     for col in current_df.columns
                 )
                 
@@ -127,43 +116,30 @@ class DataWidgetsMixin:
                     
                     cells_html = []
                     for j, cell in enumerate(row):
-                        cell_style = 'padding: 1rem; border-bottom: 1px solid var(--sl-color-neutral-200);'
+                        cell_cls = 'p:1rem bb:1|solid|neutral-200'
                         if j == 0:
-                            cell_style += ' text-align: left;'
+                            cell_cls += ' text:left'
                             if is_highlight:
-                                cell_style += ' font-weight: 700; color: #A855F7;'
+                                cell_cls += ' fw:700 color:#A855F7'
                         else:
-                            cell_style += ' text-align: center;'
+                            cell_cls += ' text:center'
                             if is_highlight:
-                                cell_style += ' font-weight: 600;'
+                                cell_cls += ' fw:600'
                             if '✅' in str(cell):
-                                cell_style += ' color: #22c55e; font-weight: 600;'
+                                cell_cls += ' color:#22c55e fw:600'
                         
-                        cells_html.append(f'<td style="{cell_style}">{cell}</td>')
+                        cells_html.append(f'<td class="{cell_cls}">{cell}</td>')
                     
                     rows_html.append(f'<tr style="{row_style}">{"".join(cells_html)}</tr>')
                 
-                title_html = f'<div class="table-header">{title}</div>' if title else ''
+                title_html = f'<div class="font:1.8rem fw:700 text:center mb:2rem color:neutral-900">{title}</div>' if title else ''
+                
+                final_cls = build_cls(f"bg:neutral-50 r:20 p:2.5rem my:1.5rem {cls}", **props)
                 
                 styled_html = f'''
-                <style>
-                .styled-table-{cid} {{
-                    background: var(--sl-color-neutral-50);
-                    border-radius: 20px;
-                    padding: 2.5rem;
-                    margin: 1.5rem 0;
-                }}
-                .styled-table-{cid} .table-header {{
-                    font-size: 1.8rem;
-                    font-weight: 700;
-                    text-align: center;
-                    margin-bottom: 2rem;
-                    color: var(--sl-color-neutral-900);
-                }}
-                </style>
-                <div class="styled-table-{cid}">
+                <div class="{final_cls}">
                     {title_html}
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+                    <table class="w:full border-collapse font-size:0.95rem">
                         <thead>
                             <tr style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(217, 70, 239, 0.1));">
                                 {headers_html}
@@ -179,27 +155,16 @@ class DataWidgetsMixin:
             else:
                 # Default table
                 html_table = current_df.to_html(index=False, border=0, classes=['data-table'])
+                
+                final_cls = build_cls(f"overflow-x:auto b:1|solid|border r:0.5rem {cls}", **props)
+                
                 styled_html = f'''
-                <div style="overflow-x:auto;border:1px solid var(--sl-border);border-radius:0.5rem;">
+                <div class="{final_cls}">
                     <style>
-                        .data-table {{
-                            width: 100%;
-                            border-collapse: collapse;
-                            background: var(--sl-bg-card);
-                            color: var(--sl-text);
-                        }}
-                        .data-table thead {{
-                            background: var(--sl-primary);
-                            color: white;
-                        }}
-                        .data-table th, .data-table td {{
-                            padding: 0.75rem;
-                            text-align: left;
-                            border-bottom: 1px solid var(--sl-border);
-                        }}
-                        .data-table tbody tr:hover {{
-                            background: color-mix(in srgb, var(--sl-bg-card), var(--sl-primary) 5%);
-                        }}
+                        .data-table {{ width: 100%; border-collapse: collapse; background: var(--sl-bg-card); color: var(--sl-text); }}
+                        .data-table thead {{ background: var(--sl-primary); color: white; }}
+                        .data-table th, .data-table td {{ padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--sl-border); }}
+                        .data-table tbody tr:hover {{ background: color-mix(in srgb, var(--sl-bg-card), var(--sl-primary) 5%); }}
                     </style>
                     {html_table}
                 </div>
@@ -207,8 +172,8 @@ class DataWidgetsMixin:
                 return Component("div", id=cid, content=styled_html)
         self._register_component(cid, builder)
 
-    def data_editor(self, df: pd.DataFrame, num_rows="fixed", height=400, key=None, on_change=None, **props):
-        """Interactive data editor (simplified version)"""
+    def data_editor(self, df: pd.DataFrame, num_rows="fixed", height=400, key=None, on_change=None, cls: str = "", **props):
+        """Interactive data editor"""
         cid = self._get_next_cid("data_editor")
         
         state_key = key or f"data_editor:{cid}"
@@ -222,22 +187,23 @@ class DataWidgetsMixin:
             except: pass
         
         def builder():
-            # Subscribe to own state - client-side will handle smart updates
             token = rendering_ctx.set(cid)
             data = s.value
             rendering_ctx.reset(token)
             
             cols = [{"field": c, "sortable": True, "filter": True, "editable": True} for c in df.columns]
             add_row_btn = '' if num_rows == "fixed" else f'''
-            <sl-button size="small" style="margin-top:0.5rem;" onclick="addDataRow_{cid}()">
+            <sl-button size="small" class="mt:0.5rem" onclick="addDataRow_{cid}()">
                 <sl-icon slot="prefix" name="plus-circle"></sl-icon>
                 Add Row
             </sl-button>
             '''
             
+            final_cls = build_cls(f"ag-theme-alpine-dark w:full {cls}", **props)
+            
             html = f'''
             <div>
-                <div id="{cid}" style="height: {height}px; width: 100%;" class="ag-theme-alpine-dark"></div>
+                <div id="{cid}" style="height: {height}px;" class="{final_cls}"></div>
                 {add_row_btn}
             </div>
             <script>(function(){{
@@ -251,7 +217,6 @@ class DataWidgetsMixin:
                         {f"sendAction('{cid}', allData);" if self.mode == 'ws' else f"htmx.ajax('POST', '/action/{cid}', {{values: {{value: JSON.stringify(allData)}} , swap: 'none'}});"}
                     }},
                     onGridReady: (params) => {{
-                        // Store API when grid is ready
                         window['gridApi_{cid}'] = params.api;
                     }}
                 }};
@@ -261,14 +226,11 @@ class DataWidgetsMixin:
                 }}
                 
                 window.addDataRow_{cid} = function() {{
-                    // Access stored grid API
                     const api = window['gridApi_{cid}'];
                     if (api && api.applyTransaction) {{
-                        // Add empty row with all column fields
                         const newRow = {{}};
                         {json.dumps([c for c in df.columns])}.forEach(col => newRow[col] = '');
                         api.applyTransaction({{add: [newRow]}});
-                        // Trigger data update to sync with backend
                         const allData = [];
                         api.forEachNode(node => allData.push(node.data));
                         {f"sendAction('{cid}', allData);" if self.mode == 'ws' else f"htmx.ajax('POST', '/action/{cid}', {{values: {{value: JSON.stringify(allData)}} , swap: 'none'}});"}
@@ -283,24 +245,13 @@ class DataWidgetsMixin:
 
     def metric(self, label: str, value: Union[str, int, float, State, Callable], 
                delta: Optional[Union[str, State, Callable]] = None, delta_color: str = "normal",
-               icon: str = None, border_color: str = None, help_text: str = None):
-        """Display metric value with Signal support
-        
-        Args:
-            label: Metric label
-            value: Metric value (supports State, Callable)
-            delta: Optional delta/change value
-            delta_color: 'positive', 'negative', or 'normal'
-            icon: Optional Shoelace icon name
-            border_color: Optional left border accent color
-            help_text: Optional help text below value
-        """
+               icon: str = None, border_color: str = None, help_text: str = None, cls: str = "", **props):
+        """Display metric value with Signal support"""
         import html as html_lib
         
         cid = self._get_next_cid("metric")
         
         def builder():
-            # Handle value signal
             curr_val = value
             if isinstance(value, State):
                 token = rendering_ctx.set(cid)
@@ -311,7 +262,6 @@ class DataWidgetsMixin:
                 curr_val = value()
                 rendering_ctx.reset(token)
                 
-            # Handle delta signal
             curr_delta = delta
             if isinstance(delta, State):
                 token = rendering_ctx.set(cid)
@@ -331,31 +281,30 @@ class DataWidgetsMixin:
                 color_map = {"positive": "#10b981", "negative": "#ef4444", "normal": "var(--sl-text-muted)"}
                 color = color_map.get(delta_color, "var(--sl-text-muted)")
                 delta_icon = "arrow-up" if delta_color == "positive" else "arrow-down" if delta_color == "negative" else ""
-                icon_html = f'<sl-icon name="{delta_icon}" style="font-size: 0.8em; margin-right: 2px;"></sl-icon>' if delta_icon else ""
-                delta_html = f'<div style="color: {color}; font-size: 0.9rem; margin-top: 0.25rem; font-weight: 500;">{icon_html}{escaped_delta}</div>'
+                icon_html = f'<sl-icon name="{delta_icon}" class="font-size:0.8em mr:2px"></sl-icon>' if delta_icon else ""
+                delta_html = f'<div style="color: {color};" class="font-size:0.9rem mt:0.25rem fw:500">{icon_html}{escaped_delta}</div>'
             
-            # Icon
             metric_icon = ""
             if icon:
-                metric_icon = f'<sl-icon name="{icon}" style="font-size: 1.5rem; color: var(--sl-primary); margin-right: 0.75rem;"></sl-icon>'
+                metric_icon = f'<sl-icon name="{icon}" class="font-size:1.5rem color:primary mr:0.75rem"></sl-icon>'
             
-            # Border accent
             border_style = ""
             if border_color:
                 border_style = f"border-left: 4px solid {border_color}; padding-left: 1.25rem;"
             
-            # Help text
             help_html = ""
             if help_text:
-                help_html = f'<div style="font-size: 0.75rem; color: var(--sl-color-neutral-500); margin-top: 0.5rem;">{html_lib.escape(help_text)}</div>'
+                help_html = f'<div class="font-size:0.75rem color:neutral-500 mt:0.5rem">{html_lib.escape(help_text)}</div>'
+            
+            final_cls = build_cls(f"card p:1.25rem {cls}", **props)
             
             html_output = f'''
-            <div class="card" style="padding: 1.25rem; {border_style}">
-                <div style="display: flex; align-items: flex-start;">
+            <div class="{final_cls}" style="{border_style}">
+                <div class="flex ai:start">
                     {metric_icon}
-                    <div style="flex: 1;">
-                        <div style="font-size: 0.875rem; color: var(--sl-text-muted); margin-bottom: 0.5rem; font-weight: 500;">{escaped_label}</div>
-                        <div style="font-size: 1.75rem; font-weight: 700; color: var(--sl-text);">{escaped_val}</div>
+                    <div class="flex:1">
+                        <div class="font-size:0.875rem color:text-muted mb:0.5rem fw:500">{escaped_label}</div>
+                        <div class="font-size:1.75rem fw:700 color:text">{escaped_val}</div>
                         {delta_html}
                         {help_html}
                     </div>
@@ -366,14 +315,17 @@ class DataWidgetsMixin:
             
         self._register_component(cid, builder)
 
-    def json(self, body: Any, expanded=True):
+    def json(self, body: Any, expanded=True, cls: str = "", **props):
         """Display JSON data"""
         cid = self._get_next_cid("json")
         json_str = json.dumps(body, indent=2, default=str)
+        
+        final_cls = build_cls(f"bg:bg-card b:1|solid|border r:0.5rem p:0.5rem {cls}", **props)
+        
         html = f'''
-        <details {"open" if expanded else ""} style="background:var(--sl-bg-card);border:1px solid var(--sl-border);border-radius:0.5rem;padding:0.5rem;">
-            <summary style="cursor:pointer;font-size:0.875rem;color:var(--sl-text-muted);">JSON Data</summary>
-            <pre style="margin:0.5rem 0 0 0;font-size:0.875rem;color:var(--sl-primary);">{json_str}</pre>
+        <details {"open" if expanded else ""} class="{final_cls}">
+            <summary class="cursor:pointer font-size:0.875rem color:text-muted">JSON Data</summary>
+            <pre class="m:0.5rem|0|0|0 font-size:0.875rem color:primary">{json_str}</pre>
         </details>
         '''
         return Component("div", id=cid, content=html)
@@ -382,42 +334,17 @@ class DataWidgetsMixin:
                 start_date=None, end_date=None,
                 color_map=None, show_legend=True, 
                 show_weekdays=True, show_months=True,
-                cell_size=12, gap=3, on_cell_clicked=None, **props):
-        """
-        Display GitHub-style activity heatmap
-        
-        Args:
-            data: Dict mapping date strings (YYYY-MM-DD) to values, or State/Callable
-            start_date: Start date (string or date object)
-            end_date: End date (string or date object)
-            color_map: Dict mapping values to colors
-                Example: {0: '#ebedf0', 1: '#10b981', 2: '#fbbf24'}
-            show_legend: Show color legend
-            show_weekdays: Show weekday labels
-            show_months: Show month labels
-            cell_size: Size of each cell in pixels
-            gap: Gap between cells in pixels
-            on_cell_clicked: Callback for cell clicks
-        
-        Example:
-            app.heatmap(
-                data={date: status for date, status in completions.items()},
-                start_date='2026-01-01',
-                end_date='2026-12-31',
-                color_map={0: '#ebedf0', 1: '#10b981', 2: '#fbbf24'}
-            )
-        """
+                cell_size=12, gap=3, on_cell_clicked=None, cls: str = "", **props):
+        """Display GitHub-style activity heatmap"""
         from datetime import date as date_obj, timedelta
         
         cid = self._get_next_cid("heatmap")
         
         def action(v):
-            """Handle cell click events"""
             if on_cell_clicked and callable(on_cell_clicked):
                 on_cell_clicked(v)
         
         def builder():
-            # Handle Signal/Callable
             current_data = data
             if isinstance(data, State):
                 token = rendering_ctx.set(cid)
@@ -428,7 +355,6 @@ class DataWidgetsMixin:
                 current_data = data()
                 rendering_ctx.reset(token)
             
-            # Parse dates
             if start_date:
                 if isinstance(start_date, str):
                     start = date_obj.fromisoformat(start_date)
@@ -445,17 +371,14 @@ class DataWidgetsMixin:
             else:
                 end = date_obj.today().replace(month=12, day=31)
             
-            # Default color map (use current_color_map to avoid variable shadowing)
             current_color_map = color_map if color_map is not None else {
                 0: '#ebedf0',
                 1: '#10b981',
                 2: '#fbbf24'
             }
             
-            # Adjust start to Sunday
             start_day = start - timedelta(days=start.weekday() + 1 if start.weekday() != 6 else 0)
             
-            # Generate week data
             weeks = []
             current = start_day
             
@@ -471,76 +394,24 @@ class DataWidgetsMixin:
                     current += timedelta(days=1)
                 weeks.append(week)
             
-            # CSS
+            # Use Master CSS for layout where possible, but grid calculations are specific
+            final_cls = build_cls(f"bg:white p:1.5rem r:8 overflow-x:auto {cls}", **props)
+            
             css = f'''
             <style>
-            .heatmap-{cid} {{
-                background: white;
-                padding: 1.5rem;
-                border-radius: 8px;
-                overflow-x: auto;
-            }}
-            .heatmap-{cid} .grid {{
-                display: flex;
-                gap: {gap}px;
-            }}
-            .heatmap-{cid} .weekdays {{
-                display: flex;
-                flex-direction: column;
-                gap: {gap}px;
-                padding-top: 20px;
-                margin-right: 4px;
-            }}
-            .heatmap-{cid} .day-label {{
-                height: {cell_size}px;
-                font-size: 9px;
-                color: #666;
-                display: flex;
-                align-items: center;
-            }}
-            .heatmap-{cid} .week {{
-                display: flex;
-                flex-direction: column;
-                gap: {gap}px;
-            }}
-            .heatmap-{cid} .month {{
-                height: 14px;
-                font-size: 9px;
-                color: #666;
-                text-align: center;
-                margin-bottom: 2px;
-            }}
-            .heatmap-{cid} .cell {{
-                width: {cell_size}px;
-                height: {cell_size}px;
-                border-radius: 2px;
-                border: 1px solid #fff;
-                cursor: pointer;
-            }}
-            .heatmap-{cid} .cell:hover {{
-                opacity: 0.8;
-                border: 1px solid #000;
-            }}
-            .heatmap-{cid} .cell.today {{
-                border: 2px solid #000;
-            }}
-            .heatmap-{cid} .legend {{
-                margin-top: 1rem;
-                display: flex;
-                gap: 1rem;
-                font-size: 11px;
-                color: #666;
-                align-items: center;
-            }}
-            .heatmap-{cid} .legend-item {{
-                display: flex;
-                align-items: center;
-                gap: 4px;
-            }}
+            .heatmap-{cid} .grid {{ display: flex; gap: {gap}px; }}
+            .heatmap-{cid} .weekdays {{ display: flex; flex-direction: column; gap: {gap}px; padding-top: 20px; margin-right: 4px; }}
+            .heatmap-{cid} .day-label {{ height: {cell_size}px; font-size: 9px; color: #666; display: flex; align-items: center; }}
+            .heatmap-{cid} .week {{ display: flex; flex-direction: column; gap: {gap}px; }}
+            .heatmap-{cid} .month {{ height: 14px; font-size: 9px; color: #666; text-align: center; margin-bottom: 2px; }}
+            .heatmap-{cid} .cell {{ width: {cell_size}px; height: {cell_size}px; border-radius: 2px; border: 1px solid #fff; cursor: pointer; }}
+            .heatmap-{cid} .cell:hover {{ opacity: 0.8; border: 1px solid #000; }}
+            .heatmap-{cid} .cell.today {{ border: 2px solid #000; }}
+            .heatmap-{cid} .legend {{ margin-top: 1rem; display: flex; gap: 1rem; font-size: 11px; color: #666; align-items: center; }}
+            .heatmap-{cid} .legend-item {{ display: flex; align-items: center; gap: 4px; }}
             </style>
             '''
             
-            # Weekday labels
             weekday_html = ''
             if show_weekdays:
                 weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -550,13 +421,11 @@ class DataWidgetsMixin:
                 </div>
                 '''
             
-            # Generate weeks HTML
             today = date_obj.today()
             current_month = None
             weeks_html = []
             
             for week in weeks:
-                # Month label
                 first_valid = next((d for d in week if d['valid']), None)
                 if first_valid and show_months:
                     month = first_valid['date'].month
@@ -565,7 +434,6 @@ class DataWidgetsMixin:
                 else:
                     month_label = ""
                 
-                # Cells
                 cells_html = []
                 for day in week:
                     if not day['valid']:
@@ -577,7 +445,6 @@ class DataWidgetsMixin:
                         today_class = ' today' if is_today else ''
                         date_str = day['date'].isoformat()
                         
-                        # Click handler
                         click_attr = ''
                         if on_cell_clicked:
                             click_js = f"window.sendAction('{cid}', {{date: '{date_str}', value: {value}}});" if self.mode == 'ws' else f"htmx.ajax('POST', '/action/{cid}', {{values: {{value: JSON.stringify({{date: '{date_str}', value: {value}}})}}), swap: 'none'}});"
@@ -594,7 +461,6 @@ class DataWidgetsMixin:
                 </div>
                 ''')
             
-            # Legend
             legend_html = ''
             if show_legend:
                 legend_items = [
@@ -614,13 +480,12 @@ class DataWidgetsMixin:
                 </div>
                 '''
             
-            # Final HTML
             html = f'''
             {css}
-            <div class="heatmap-{cid}">
+            <div class="heatmap-{cid} {final_cls}">
                 <div class="grid">
                     {weekday_html}
-                    <div style="display: flex; gap: {gap}px;">
+                    <div class="flex gap:{gap}px">
                         {"".join(weeks_html)}
                     </div>
                 </div>

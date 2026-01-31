@@ -7,12 +7,13 @@ import plotly.io as pio
 from ..component import Component
 from ..context import rendering_ctx
 from ..state import State
+from ..style_utils import build_cls
 
 
 class ChartWidgetsMixin:
     """Chart widgets (line, bar, area, scatter, plotly, pyplot, etc.)"""
     
-    def plotly_chart(self, fig: Union[go.Figure, Callable, State], use_container_width=True, render_mode="svg", **props):
+    def plotly_chart(self, fig: Union[go.Figure, Callable, State], use_container_width=True, render_mode="svg", cls: str = "", **props):
         """Display Plotly chart with Signal/Lambda support"""
         cid = self._get_next_cid("plot")
         
@@ -32,11 +33,9 @@ class ChartWidgetsMixin:
                 return Component("div", id=f"{cid}_wrapper", content="No data")
 
             # Force render_mode if requested (default: svg)
-            # Convert scattergl to scatter for SVG rendering
             if render_mode == "svg" and hasattr(current_fig, "data"):
                 has_scattergl = any(trace.type == 'scattergl' for trace in current_fig.data)
                 if has_scattergl:
-                    # Create new figure with converted traces
                     new_traces = []
                     for trace in current_fig.data:
                         if trace.type == 'scattergl':
@@ -45,13 +44,15 @@ class ChartWidgetsMixin:
                             new_traces.append(go.Scatter(trace_dict))
                         else:
                             new_traces.append(trace)
-                    # Recreate figure with new traces and original layout
                     current_fig = go.Figure(data=new_traces, layout=current_fig.layout)
                 
             fj = pio.to_json(current_fig)
             width_style = "width: 100%;" if use_container_width else ""
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div id="{cid}" style="{width_style} height: 500px;"></div>
+            <div id="{cid}" style="{width_style} height: 500px;" class="{final_cls}"></div>
             <script>(function(){{
                 const d = {fj};
                 if (window.Plotly) {{
@@ -66,7 +67,7 @@ class ChartWidgetsMixin:
         self._register_component(cid, builder)
 
 
-    def pyplot(self, fig=None, use_container_width=True, **props):
+    def pyplot(self, fig=None, use_container_width=True, cls: str = "", **props):
         """Display Matplotlib figure"""
         import matplotlib
         matplotlib.use('Agg')
@@ -86,12 +87,15 @@ class ChartWidgetsMixin:
             buf.close()
             
             width_style = "width: 100%;" if use_container_width else ""
-            html = f'<img src="data:image/png;base64,{img_base64}" style="{width_style} height: auto;" />'
-            return Component("div", id=cid, content=html, class_="pyplot-container")
+            
+            final_cls = build_cls(f"pyplot-container {cls}", **props)
+            
+            html = f'<img src="data:image/png;base64,{img_base64}" style="{width_style} height: auto;" class="{final_cls}" />'
+            return Component("div", id=cid, content=html)
         
         self._register_component(cid, builder)
 
-    def line_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", **props):
+    def line_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", cls: str = "", **props):
         """Display simple line chart"""
         cid = self._get_next_cid("line_chart")
         
@@ -99,8 +103,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, mode='lines+markers', name=trace_name))
+            cls_type = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(cls_type(x=x_data, y=y_data, mode='lines+markers', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),
@@ -109,8 +113,11 @@ class ChartWidgetsMixin:
             
             fj = pio.to_json(fig)
             container_width = "width: 100%;" if use_container_width else f"width: {width}px;" if width else "width: 100%;"
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div id="{cid}" style="{container_width} height: {height}px;"></div>
+            <div id="{cid}" style="{container_width} height: {height}px;" class="{final_cls}"></div>
             <script>(function(){{
                 const d = {fj};
                 Plotly.newPlot('{cid}', d.data, d.layout, {{responsive: true}});
@@ -120,7 +127,7 @@ class ChartWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def bar_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", **props):
+    def bar_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", cls: str = "", **props):
         """Display simple bar chart"""
         cid = self._get_next_cid("bar_chart")
         
@@ -137,8 +144,11 @@ class ChartWidgetsMixin:
             
             fj = pio.to_json(fig)
             container_width = "width: 100%;" if use_container_width else f"width: {width}px;" if width else "width: 100%;"
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div id="{cid}" style="{container_width} height: {height}px;"></div>
+            <div id="{cid}" style="{container_width} height: {height}px;" class="{final_cls}"></div>
             <script>(function(){{
                 const d = {fj};
                 Plotly.newPlot('{cid}', d.data, d.layout, {{responsive: true}});
@@ -148,7 +158,7 @@ class ChartWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def area_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", **props):
+    def area_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", cls: str = "", **props):
         """Display area chart"""
         cid = self._get_next_cid("area_chart")
         
@@ -156,8 +166,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, fill='tozeroy', name=trace_name))
+            cls_type = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(cls_type(x=x_data, y=y_data, fill='tozeroy', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),
@@ -166,8 +176,11 @@ class ChartWidgetsMixin:
             
             fj = pio.to_json(fig)
             container_width = "width: 100%;" if use_container_width else f"width: {width}px;" if width else "width: 100%;"
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div id="{cid}" style="{container_width} height: {height}px;"></div>
+            <div id="{cid}" style="{container_width} height: {height}px;" class="{final_cls}"></div>
             <script>(function(){{
                 const d = {fj};
                 Plotly.newPlot('{cid}', d.data, d.layout, {{responsive: true}});
@@ -177,7 +190,7 @@ class ChartWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def scatter_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", **props):
+    def scatter_chart(self, data, x=None, y=None, width=None, height=400, use_container_width=True, render_mode="svg", cls: str = "", **props):
         """Display scatter chart"""
         cid = self._get_next_cid("scatter_chart")
         
@@ -185,8 +198,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, mode='markers', name=trace_name))
+            cls_type = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(cls_type(x=x_data, y=y_data, mode='markers', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),
@@ -195,8 +208,11 @@ class ChartWidgetsMixin:
             
             fj = pio.to_json(fig)
             container_width = "width: 100%;" if use_container_width else f"width: {width}px;" if width else "width: 100%;"
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div id="{cid}" style="{container_width} height: {height}px;"></div>
+            <div id="{cid}" style="{container_width} height: {height}px;" class="{final_cls}"></div>
             <script>(function(){{
                 const d = {fj};
                 Plotly.newPlot('{cid}', d.data, d.layout, {{responsive: true}});
@@ -206,7 +222,7 @@ class ChartWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def bokeh_chart(self, figure, use_container_width=True, **props):
+    def bokeh_chart(self, figure, use_container_width=True, cls: str = "", **props):
         """Display Bokeh chart"""
         from bokeh.embed import components
         
@@ -215,8 +231,11 @@ class ChartWidgetsMixin:
         def builder():
             script, div = components(figure)
             width_style = "width: 100%;" if use_container_width else ""
+            
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <div style="{width_style}">
+            <div style="{width_style}" class="{final_cls}">
                 {div}
                 {script}
             </div>

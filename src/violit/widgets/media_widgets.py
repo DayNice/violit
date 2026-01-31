@@ -4,12 +4,13 @@ from typing import Union, Optional
 import base64
 from ..component import Component
 from ..context import rendering_ctx
+from ..style_utils import build_cls
 
 
 class MediaWidgetsMixin:
     """Media widgets (image, audio, video)"""
     
-    def image(self, image, caption=None, width=None, use_column_width=False, **props):
+    def image(self, image, caption=None, width=None, use_column_width=False, cls: str = "", **props):
         """Display image from various sources"""
         cid = self._get_next_cid("image")
         
@@ -70,10 +71,12 @@ class MediaWidgetsMixin:
             
             caption_html = ""
             if caption:
-                caption_html = f'<div style="text-align:center;margin-top:0.5rem;color:var(--sl-text-muted);font-size:0.875rem;">{caption}</div>'
+                caption_html = f'<div class="text:center mt:0.5rem color:text-muted font-size:0.875rem">{caption}</div>'
+            
+            final_cls = build_cls(cls, **props)
             
             html = f'''
-            <div class="image-container" style="text-align:center;">
+            <div class="image-container text:center {final_cls}">
                 <img src="{img_src}" style="{width_style} height:auto;border-radius:0.5rem;" alt="{caption or ''}" />
                 {caption_html}
             </div>
@@ -82,7 +85,7 @@ class MediaWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def audio(self, audio, format="audio/mp3", start_time=0, **props):
+    def audio(self, audio, format="audio/mp3", start_time=0, cls: str = "", **props):
         """Display audio player"""
         cid = self._get_next_cid("audio")
         
@@ -123,8 +126,10 @@ class MediaWidgetsMixin:
                 except:
                     audio_src = str(audio)
             
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <audio controls style="width:100%;border-radius:0.5rem;">
+            <audio controls class="w:full r:0.5rem {final_cls}">
                 <source src="{audio_src}" type="{format}">
                 Your browser does not support the audio element.
             </audio>
@@ -133,7 +138,7 @@ class MediaWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def video(self, video, format="video/mp4", start_time=0, **props):
+    def video(self, video, format="video/mp4", start_time=0, cls: str = "", **props):
         """Display video player"""
         cid = self._get_next_cid("video")
         
@@ -162,8 +167,10 @@ class MediaWidgetsMixin:
             else:
                 video_src = str(video)
             
+            final_cls = build_cls(cls, **props)
+            
             html = f'''
-            <video controls style="width:100%;border-radius:0.5rem;">
+            <video controls class="w:full r:0.5rem {final_cls}">
                 <source src="{video_src}" type="{format}">
                 Your browser does not support the video element.
             </video>

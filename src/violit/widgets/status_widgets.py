@@ -4,28 +4,29 @@ from typing import Union, Callable, Optional
 from ..component import Component
 from ..context import rendering_ctx
 from ..state import get_session_store, State
+from ..style_utils import build_cls
 
 
 class StatusWidgetsMixin:
     """Status display widgets (success, info, warning, error, toast, progress, spinner, status, balloons, snow, exception)"""
     
-    def success(self, content): 
+    def success(self, content, cls: str = "", **props): 
         """Display success alert"""
-        self.alert(content, "success", "check-circle")
+        self.alert(content, "success", "check-circle", cls, **props)
     
-    def warning(self, content): 
+    def warning(self, content, cls: str = "", **props): 
         """Display warning alert"""
-        self.alert(content, "warning", "exclamation-triangle")
+        self.alert(content, "warning", "exclamation-triangle", cls, **props)
     
-    def error(self, content): 
+    def error(self, content, cls: str = "", **props): 
         """Display error alert"""
-        self.alert(content, "danger", "x-circle")
+        self.alert(content, "danger", "x-circle", cls, **props)
     
-    def info(self, content): 
+    def info(self, content, cls: str = "", **props): 
         """Display info alert"""
-        self.alert(content, "primary", "info-circle")
+        self.alert(content, "primary", "info-circle", cls, **props)
     
-    def alert(self, content: Union[str, Callable, State], variant="primary", icon=None):
+    def alert(self, content: Union[str, Callable, State], variant="primary", icon=None, cls: str = "", **props):
         """Display alert message with Signal support"""
         import html as html_lib
         
@@ -46,7 +47,10 @@ class StatusWidgetsMixin:
             escaped_val = html_lib.escape(str(val))
             
             icon_html = f'<sl-icon slot="icon" name="{icon}"></sl-icon>' if icon else ""
-            html_output = f'<sl-alert variant="{variant}" open>{icon_html}{escaped_val}</sl-alert>'
+            
+            final_cls = build_cls(cls, **props)
+            
+            html_output = f'<sl-alert variant="{variant}" open class="{final_cls}">{icon_html}{escaped_val}</sl-alert>'
             return Component("div", id=cid, content=html_output)
         self._register_component(cid, builder)
 
@@ -87,7 +91,7 @@ class StatusWidgetsMixin:
         code = "createSnow()"
         self._enqueue_eval(code, effect="snow")
 
-    def exception(self, exception: Exception):
+    def exception(self, exception: Exception, cls: str = "", **props):
         """Display exception with traceback"""
         import traceback
         import html as html_lib
@@ -101,11 +105,13 @@ class StatusWidgetsMixin:
             escaped_msg = html_lib.escape(str(exception))
             escaped_tb = html_lib.escape(tb)
             
+            final_cls = build_cls(f"mb:1rem {cls}", **props)
+            
             html_output = f'''
-            <sl-alert variant="danger" open style="margin-bottom:1rem;">
+            <sl-alert variant="danger" open class="{final_cls}">
                 <sl-icon slot="icon" name="exclamation-octagon"></sl-icon>
                 <strong>{escaped_name}:</strong> {escaped_msg}
-                <pre style="margin-top:0.5rem;padding:0.5rem;background:rgba(0,0,0,0.1);border-radius:0.25rem;overflow-x:auto;font-size:0.85rem;">{escaped_tb}</pre>
+                <pre class="mt:0.5rem p:0.5rem bg:rgba(0,0,0,0.1) r:0.25rem overflow-x:auto font-size:0.85rem">{escaped_tb}</pre>
             </sl-alert>
             '''
             return Component("div", id=cid, content=html_output)
@@ -127,7 +133,7 @@ class StatusWidgetsMixin:
             if 'effect' in lite_data:
                 store['effects'].append(lite_data['effect'])
 
-    def progress(self, value=0, text=None):
+    def progress(self, value=0, text=None, cls: str = "", **props):
         """Display progress bar with Signal support"""
         import html as html_lib
         
@@ -149,11 +155,13 @@ class StatusWidgetsMixin:
             # XSS protection: escape text
             escaped_text = html_lib.escape(str(progress_text))
             
+            final_cls = build_cls(f"mb:0.5rem {cls}", **props)
+            
             html_output = f'''
-            <div style="margin-bottom:0.5rem;">
-                <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;">
-                    <span style="font-size:0.875rem;color:var(--sl-text);">{escaped_text}</span>
-                    <span style="font-size:0.875rem;color:var(--sl-text-muted);">{val_num}%</span>
+            <div class="{final_cls}">
+                <div class="flex jc:space-between mb:0.25rem">
+                    <span class="font-size:0.875rem color:text">{escaped_text}</span>
+                    <span class="font-size:0.875rem color:text-muted">{val_num}%</span>
                 </div>
                 <sl-progress-bar value="{val_num}"></sl-progress-bar>
             </div>
@@ -161,7 +169,7 @@ class StatusWidgetsMixin:
             return Component("div", id=cid, content=html_output)
         self._register_component(cid, builder)
 
-    def spinner(self, text="Loading..."):
+    def spinner(self, text="Loading...", cls: str = "", **props):
         """Display loading spinner"""
         import html as html_lib
         
@@ -170,26 +178,30 @@ class StatusWidgetsMixin:
         # XSS protection: escape text
         escaped_text = html_lib.escape(str(text))
         
+        final_cls = build_cls(f"flex ai:center gap:0.5rem mb:1rem {cls}", **props)
+        
         html_output = f'''
-        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
-            <sl-spinner style="font-size:1.5rem;"></sl-spinner>
-            <span style="color:var(--sl-text-muted);font-size:0.875rem;">{escaped_text}</span>
+        <div class="{final_cls}">
+            <sl-spinner class="font-size:1.5rem"></sl-spinner>
+            <span class="color:text-muted font-size:0.875rem">{escaped_text}</span>
         </div>
         '''
         return Component("div", id=cid, content=html_output)
     
-    def status(self, label: str, state: str = "running", expanded: bool = True):
+    def status(self, label: str, state: str = "running", expanded: bool = True, cls: str = "", **props):
         from ..context import fragment_ctx
         
         cid = self._get_next_cid("status")
         
         class StatusContext:
-            def __init__(self, app, status_id, label, state, expanded):
+            def __init__(self, app, status_id, label, state, expanded, cls, props):
                 self.app = app
                 self.status_id = status_id
                 self.label = label
                 self.state = state
                 self.expanded = expanded
+                self.cls = cls
+                self.props = props
                 self.token = None
                 
             def __enter__(self):
@@ -226,10 +238,12 @@ class StatusWidgetsMixin:
                     import html as html_lib
                     escaped_label = html_lib.escape(str(self.label))
                     
+                    final_cls = build_cls(f"mb:1rem {self.cls}", **self.props)
+                    
                     # Build status container
                     html_output = f'''
-                    <sl-details {"open" if self.expanded else ""} style="margin-bottom:1rem;">
-                        <div slot="summary" style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+                    <sl-details {"open" if self.expanded else ""} class="{final_cls}">
+                        <div slot="summary" class="flex ai:center gap:0.5rem fw:600">
                             {icon}
                             <span>{escaped_label}</span>
                         </div>
@@ -252,4 +266,4 @@ class StatusWidgetsMixin:
             def __getattr__(self, name):
                 return getattr(self.app, name)
                 
-        return StatusContext(self, cid, label, state, expanded)
+        return StatusContext(self, cid, label, state, expanded, cls, props)

@@ -26,7 +26,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from .context import session_ctx, rendering_ctx, fragment_ctx, app_instance_ref, layout_ctx
+from .context import session_ctx, rendering_ctx, fragment_ctx, app_instance_ref, layout_ctx, page_ctx
 from .theme import Theme
 from .component import Component
 from .engine import LiteEngine, WsEngine
@@ -443,17 +443,71 @@ class App(
     def reactivity(self, func: Optional[Callable] = None):
         """Create a reactive scope for complex control flow
         
-        Use as context manager for reactive if/for loops
+        Can be used as:
+        1. Decorator: @app.reactivity for function-wrapped reactive blocks
+        2. Context Manager: with app.reactivity(): for inline reactive blocks (triggers page rerun)
+        
+        Example (Decorator - Partial Rerun):
+            @app.reactivity
+            def my_reactive_block():
+                if count.value > 5:
+                    app.success("Big!")
+            my_reactive_block()
+            
+        Example (Context Manager - Page Rerun):
+            with app.reactivity():
+                if count.value > 5:
+                    app.success("Big!")
         """
         if func is not None:
-            # Decorator mode - deprecated
-            warnings.warn(
-                "@app.reactivity decorator is deprecated and will be removed in a future version. "
-                "Please use 'with app.reactivity():' context manager instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            return self.fragment(func)
+            # Decorator mode: wrap function as a reactive fragment
+            # This enables PARTIAL RERUN of just this function
+            fid = f"reactivity_{self._fragment_count}"
+            self._fragment_count += 1
+            
+            # Track if already registered
+            registered = [False]
+            
+            def fragment_builder():
+                token = fragment_ctx.set(fid)
+                render_token = rendering_ctx.set(fid)
+                store = get_session_store()
+                store['fragment_components'][fid] = []
+                
+                # Execute the user's function
+                func()
+                
+                # Render children
+                htmls = []
+                for cid, b in store['fragment_components'][fid]:
+                    htmls.append(b().render())
+                
+                fragment_ctx.reset(token)
+                rendering_ctx.reset(render_token)
+                
+                inner = f'<div id="{fid}" class="fragment">{" ".join(htmls)}</div>'
+                return Component("div", id=f"{fid}_wrapper", content=inner)
+            
+            # Store builder
+            self.static_builders[fid] = fragment_builder
+            self.static_fragments[fid] = func
+            
+            def wrapper():
+                """Wrapper that registers fragment on first call"""
+                if registered[0]:
+                    return
+                registered[0] = True
+                
+                sid = session_ctx.get()
+                if sid is None:
+                    # Static context: add to static_order
+                    if fid not in self.static_order:
+                        self.static_order.append(fid)
+                else:
+                    # Dynamic context: add to dynamic order
+                    self._register_component(fid, fragment_builder)
+            
+            return wrapper
         
         # Context manager mode
         class ReactivityContext:
@@ -471,6 +525,13 @@ class App(
                 # Set fragment context only (state access registers with parent)
                 ctx_self.fragment_token = fragment_ctx.set(ctx_self.fid)
                 
+                # IMPORTANT: If inside a page, enable subscription to the page renderer
+                # This allows if/for blocks inside with app.reactivity(): to trigger page re-runs
+                p_ctx = page_ctx.get()
+                ctx_self.rendering_token = None
+                if p_ctx:
+                     ctx_self.rendering_token = rendering_ctx.set(p_ctx)
+                
                 store = get_session_store()
                 store['fragment_components'][ctx_self.fid] = []
                 return ctx_self
@@ -487,11 +548,158 @@ class App(
                     return Component("div", id=f"{ctx_self.fid}_wrapper", content=inner)
                 
                 fragment_ctx.reset(ctx_self.fragment_token)
+                if ctx_self.rendering_token:
+                    rendering_ctx.reset(ctx_self.rendering_token)
                 
                 # Register the reactivity scope as a component
                 self._register_component(ctx_self.fid, reactivity_builder)
         
         return ReactivityContext(self)
+
+    def If(self, condition, then_block=None, else_block=None, *, then=None, else_=None):
+        """Reactive conditional rendering widget.
+        
+        Args:
+            condition: Boolean or Callable[[], bool]. 
+                       If callable (e.g. lambda: count.value > 5), it's re-evaluated on render.
+            then_block: Function to call when True
+            else_block: Function to call when False
+        """
+        # Resolve positional vs keyword
+        actual_then = then_block if then_block is not None else then
+        actual_else = else_block if else_block is not None else else_
+        
+        cid = self._get_next_cid("if")
+        
+        def if_builder():
+            # Set rendering context for dependency tracking
+            token = rendering_ctx.set(cid)
+            try:
+                # Evaluate condition dynamically
+                current_cond = condition
+                if callable(condition):
+                    current_cond = condition()
+                elif hasattr(condition, 'value'):
+                    current_cond = condition.value
+                
+                if current_cond:
+                    if actual_then:
+                        store = get_session_store()
+                        prev_order = store['order'].copy()
+                        store['order'] = []
+                        
+                        actual_then()
+                        
+                        htmls = []
+                        for child_cid in store['order']:
+                            builder = store['builders'].get(child_cid) or self.static_builders.get(child_cid)
+                            if builder:
+                                htmls.append(builder().render())
+                        
+                        store['order'] = prev_order
+                        content = '\n'.join(htmls)
+                        return Component("div", id=cid, content=content, class_="if-block if-then")
+                else:
+                    if actual_else:
+                        store = get_session_store()
+                        prev_order = store['order'].copy()
+                        store['order'] = []
+                        
+                        actual_else()
+                        
+                        htmls = []
+                        for child_cid in store['order']:
+                            builder = store['builders'].get(child_cid) or self.static_builders.get(child_cid)
+                            if builder:
+                                htmls.append(builder().render())
+                        
+                        store['order'] = prev_order
+                        content = '\n'.join(htmls)
+                        return Component("div", id=cid, content=content, class_="if-block if-else")
+                
+                return Component("div", id=cid, content="", class_="if-block if-empty")
+            finally:
+                rendering_ctx.reset(token)
+        
+        self._register_component(cid, if_builder)
+
+    def For(self, items, render_fn=None, empty_fn=None, *, render=None, empty=None):
+        """Reactive loop rendering widget.
+        
+        Args:
+            items: List, State, or Callable[[], List].
+            render_fn: Function(item) or Function(item, index)
+            empty_fn: Function when list is empty
+        """
+        # Resolve positional vs keyword
+        actual_render = render_fn if render_fn is not None else render
+        actual_empty = empty_fn if empty_fn is not None else empty
+        
+        cid = self._get_next_cid("for")
+        
+        def for_builder():
+            token = rendering_ctx.set(cid)
+            try:
+                store = get_session_store()
+                
+                # Evaluate items dynamically
+                current_items = items
+                if hasattr(items, 'value'): # State object
+                    current_items = items.value
+                elif callable(items):       # Lambda
+                    current_items = items()
+                
+                # Check if empty
+                if not current_items or len(current_items) == 0:
+                    if actual_empty:
+                        prev_order = store['order'].copy()
+                        store['order'] = []
+                        
+                        actual_empty()
+                        
+                        htmls = []
+                        for child_cid in store['order']:
+                            builder = store['builders'].get(child_cid) or self.static_builders.get(child_cid)
+                            if builder:
+                                htmls.append(builder().render())
+                        
+                        store['order'] = prev_order
+                        content = '\n'.join(htmls)
+                        return Component("div", id=cid, content=content, class_="for-block for-empty")
+                    else:
+                        return Component("div", id=cid, content="", class_="for-block for-empty")
+                
+                # Render each item
+                if actual_render:
+                    all_htmls = []
+                    
+                    for idx, item in enumerate(current_items):
+                        prev_order = store['order'].copy()
+                        store['order'] = []
+                        
+                        # Try to call with (item, index), fall back to (item)
+                        import inspect
+                        sig = inspect.signature(actual_render)
+                        if len(sig.parameters) >= 2:
+                            actual_render(item, idx)
+                        else:
+                            actual_render(item)
+                        
+                        for child_cid in store['order']:
+                            builder = store['builders'].get(child_cid) or self.static_builders.get(child_cid)
+                            if builder:
+                                all_htmls.append(builder().render())
+                        
+                        store['order'] = prev_order
+                    
+                    content = '\n'.join(all_htmls)
+                    return Component("div", id=cid, content=content, class_="for-block")
+                
+                return Component("div", id=cid, content="", class_="for-block")
+            finally:
+                rendering_ctx.reset(token)
+        
+        self._register_component(cid, for_builder)
 
     def _render_all(self):
         """Render all components"""
@@ -731,15 +939,20 @@ class App(
             
             def run(self):
                 # Progressive Mode: Register page renderer as a regular component
-                # The builder function reads the navigation state, enabling reactivity
-                # WITHOUT wrapping the entire page function in a fragment
+                # Navigation state changes trigger page re-render, but page function
+                # execution does NOT implicitly subscribe to other states.
+                # Use 'with app.reactivity():' for if/for reactive blocks.
                 cid = self.app._get_next_cid("page_renderer")
                 
                 def page_builder():
-                    # Read the navigation state here - this creates the dependency
+                    # Set context ONLY for reading navigation state
                     token = rendering_ctx.set(cid)
+                    
+                     # Store Current Page Renderer CID for Reactivity Blocks
+                    p_token = page_ctx.set(cid)
+
                     try:
-                        key = self.state.value
+                        key = self.state.value  # Subscribe to navigation state
                         
                         # Execute the current page function
                         p = self.pages_map.get(key)
@@ -753,11 +966,16 @@ class App(
                             store['fragment_components'] = {}  # Clear fragments to prevent duplicates
                             
                             try:
-                                # Execute page function
-                                # CRITICAL: Execute inside rendering_ctx so any state access registers dependency
+                                # Start executing page function
+                                # CRITICAL: Reset rendering_ctx so page body is static by default
+                                rendering_ctx.reset(token) 
+                                
                                 p.entry_point()
                                 
-                                # Render all components from this page
+                                # Re-enable rendering_ctx to capture dependencies during RENDER phase (if any?)
+                                # Actually, rendering happens now.
+                                token = rendering_ctx.set(cid)
+                                
                                 htmls = []
                                 for page_cid in store['order']:
                                     builder = store['builders'].get(page_cid) or self.app.static_builders.get(page_cid)
@@ -773,7 +991,10 @@ class App(
                         
                         return Component("div", id=cid, content="", class_="page-container")
                     finally:
-                        rendering_ctx.reset(token)
+                         # Ensure context is reset
+                        if rendering_ctx.get() == cid:
+                             rendering_ctx.reset(token)
+                        page_ctx.reset(p_token)
                 
                 # Register the page renderer as a regular component
                 self.app._register_component(cid, page_builder)
@@ -1292,6 +1513,18 @@ class App(
         p.add_argument("--debug", action="store_true", help="Enable developer tools (native mode)")
         p.add_argument("--port", type=int, default=8000)
         args, _ = p.parse_known_args()
+
+        # [Logging Filter] Reduce noise by filtering out polling requests
+        try:
+            import logging
+            class PollingFilter(logging.Filter):
+                def filter(self, record: logging.LogRecord) -> bool:
+                    return "/?_t=" not in record.getMessage()
+            
+            # Apply filter to uvicorn.access logger
+            logging.getLogger("uvicorn.access").addFilter(PollingFilter())
+        except Exception:
+            pass # Ignore if logging setup fails
 
         if args.lite:
             self.mode = "lite"
@@ -1829,7 +2062,7 @@ HTML_TEMPLATE = """
                             serverAlive = false;
                         });
                 };
-                setInterval(checkServerHealth, 200);
+                setInterval(checkServerHealth, 2000);
             });
         }
         

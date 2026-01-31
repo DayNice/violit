@@ -74,3 +74,36 @@ class State:
     
     def __repr__(self):
         return f"State({self.name}, {self.value})"
+
+    # Reactive Comparison Operators
+    def __eq__(self, other): return ComputedState(lambda: self.value == other)
+    def __ne__(self, other): return ComputedState(lambda: self.value != other)
+    def __lt__(self, other): return ComputedState(lambda: self.value < other)
+    def __le__(self, other): return ComputedState(lambda: self.value <= other)
+    def __gt__(self, other): return ComputedState(lambda: self.value > other)
+    def __ge__(self, other): return ComputedState(lambda: self.value >= other)
+
+
+class ComputedState:
+    """A state derived from other states (e.g. expressions)"""
+    def __init__(self, func):
+        self.func = func
+
+    @property
+    def value(self):
+        return self.func()
+
+    def __bool__(self):
+        return bool(self.value)
+    
+    def __call__(self):
+        return self.value
+
+    # Logical operators for chaining
+    def __and__(self, other):
+        val_other = other.value if hasattr(other, 'value') else other
+        return ComputedState(lambda: self.value and val_other)
+    
+    def __or__(self, other):
+        val_other = other.value if hasattr(other, 'value') else other
+        return ComputedState(lambda: self.value or val_other)

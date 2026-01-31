@@ -494,17 +494,15 @@ class App(
             
             def wrapper():
                 """Wrapper that registers fragment on first call"""
-                if registered[0]:
-                    return
-                registered[0] = True
-                
                 sid = session_ctx.get()
                 if sid is None:
-                    # Static context: add to static_order
+                    # Static context: register once
+                    if registered[0]: return
+                    registered[0] = True
                     if fid not in self.static_order:
                         self.static_order.append(fid)
                 else:
-                    # Dynamic context: add to dynamic order
+                    # Dynamic context: Always register to add to current order
                     self._register_component(fid, fragment_builder)
             
             return wrapper
@@ -869,8 +867,16 @@ class App(
             return Component("div", id=cid, style="display:none", content=script_content)
         self._register_component(cid, builder)
 
-    def navigation(self, pages: List[Any], position="sidebar", auto_run=True):
-        """Create multi-page navigation"""
+    def navigation(self, pages: List[Any], position="sidebar", auto_run=True, reactivity_mode=False):
+        """Create multi-page navigation
+        
+        Args:
+            pages: List of Page objects or functions
+            position: 'sidebar' or 'top' (default: sidebar)
+            auto_run: Run logic immediately (default: True)
+            reactivity_mode: If True, treats each page as a reactive scope (auto pre-evaluates).
+                             This allows standard 'if' statements to be reactive.
+        """
         # Normalize pages
         final_pages = []
         for p in pages:
@@ -932,16 +938,16 @@ class App(
         current_key = current_page_key_state.value
         
         class PageRunner:
-            def __init__(self, app, page_state, pages_map):
+            def __init__(self, app, page_state, pages_map, reactivity_mode):
                 self.app = app
                 self.state = page_state
                 self.pages_map = pages_map
+                self.reactivity_mode = reactivity_mode
             
             def run(self):
                 # Progressive Mode: Register page renderer as a regular component
-                # Navigation state changes trigger page re-render, but page function
-                # execution does NOT implicitly subscribe to other states.
-                # Use 'with app.reactivity():' for if/for reactive blocks.
+                # Navigation state changes trigger page re-render.
+                # If reactivity_mode=True, we subscribe to state changes inside page function too.
                 cid = self.app._get_next_cid("page_renderer")
                 
                 def page_builder():
@@ -967,14 +973,16 @@ class App(
                             
                             try:
                                 # Start executing page function
-                                # CRITICAL: Reset rendering_ctx so page body is static by default
-                                rendering_ctx.reset(token) 
+                                # If reactivity_mode is False, reset context (default, non-reactive page script)
+                                # If reactivity_mode is True, KEEP context (page script registers dependencies on page_renderer)
+                                if not self.reactivity_mode:
+                                    rendering_ctx.reset(token) 
                                 
                                 p.entry_point()
                                 
-                                # Re-enable rendering_ctx to capture dependencies during RENDER phase (if any?)
-                                # Actually, rendering happens now.
-                                token = rendering_ctx.set(cid)
+                                # Re-enable rendering_ctx if it was reset
+                                if not self.reactivity_mode:
+                                    token = rendering_ctx.set(cid)
                                 
                                 htmls = []
                                 for page_cid in store['order']:
@@ -1000,7 +1008,7 @@ class App(
                 self.app._register_component(cid, page_builder)
 
 
-        page_runner = PageRunner(self, current_page_key_state, {p.key: p for p in final_pages})
+        page_runner = PageRunner(self, current_page_key_state, {p.key: p for p in final_pages}, reactivity_mode)
         
         # Auto-run if enabled
         if auto_run:

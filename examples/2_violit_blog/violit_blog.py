@@ -279,7 +279,7 @@ app.navigation([
     vl.Page(my_posts_page, title="My Posts", icon="journal-text"),
     vl.Page(login_page, title="Login/Info", icon="person"),
     vl.Page(register_page, title="Register", icon="person-plus"),
-])
+], reactivity_mode=True)
 
 if __name__ == "__main__":
     print("Violit Blog server starting...")

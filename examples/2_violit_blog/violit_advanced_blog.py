@@ -328,7 +328,7 @@ app.navigation([
     vl.Page(settings_page, title="Settings", icon="gear"),
     vl.Page(login_page, title="Login/Info", icon="person"),
     vl.Page(register_page, title="Register", icon="person-plus"),
-])
+], reactivity_mode=True)
 
 if __name__ == "__main__":
     print("Violit Advanced Blog server starting...")

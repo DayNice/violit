@@ -41,10 +41,18 @@ class LayoutWidgetsMixin:
                 # Check session
                 for cid, b in store['fragment_components'].get(col_id, []):
                     col_content.append(b().render())
-                columns_html.append(f'<div class="column-item">{"".join(col_content)}</div>')
+                
+                # Apply Flexbox Centering to each column item
+                # justify-content: center (horizontal), align-items: center (vertical)
+                # height: 100% ensures vertical centering works if heights differ
+                columns_html.append(
+                    f'<div class="column-item" style="display: flex; flex-direction: column; justify-content: center; height: 100%;">'
+                    f'{"".join(col_content)}</div>'
+                )
             
             grid_tmpl = " ".join(weights)
-            container_html = f'<div id="{columns_id}" class="columns" style="display: grid; grid-template-columns: {grid_tmpl}; gap: {gap};">{"".join(columns_html)}</div>'
+            # align-items: stretch ensures all columns have equal height
+            container_html = f'<div id="{columns_id}" class="columns" style="display: grid; grid-template-columns: {grid_tmpl}; gap: {gap}; align-items: stretch;">{"".join(columns_html)}</div>'
             return Component("div", id=f"{columns_id}_wrapper", content=container_html)
         
         self._register_component(columns_id, builder)

@@ -713,6 +713,171 @@ class Theme:
                     -webkit-text-fill-color: transparent !important;
                 }
             """
+        },
+        'violit_light': {
+            'mode': 'light',
+            'primary': '#7C3AED', 
+            'secondary': '#8B5CF6',
+            'success': '#10B981',
+            'warning': '#F59E0B',
+            'danger': '#EF4444',
+            'bg': '#FFFFFF',
+            'bg_card': '#FFFFFF',
+            'border': '#E4E4E7',
+            'text': '#18181B',
+            'text_muted': '#71717A',
+            'radius': '6px',
+            'input_border_radius_small': '4px',
+            'input_border_radius_medium': '6px',
+            'input_border_radius_large': '8px',
+            'extra_css': """
+                /* 
+                   THEME: Modern Luxury (Restrained)
+                   Concept: 'Silk & Glass' - Smooth, matte finishes with subtle light play.
+                   No loud gradients, no flashing flashing animations.
+                */
+
+                body {
+                    background-color: #FFFFFF;
+                    /* Very subtle ambient light, barely visible */
+                    background-image: radial-gradient(circle at 50% 0%, rgba(124, 58, 237, 0.03), transparent 40%);
+                }
+                
+                /* Cards: Clean, bordered, soft shadow */
+                .card {
+                    background: #FFFFFF !important;
+                    border: 1px solid #E4E4E7 !important;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+                    border-radius: 8px !important;
+                    transition: box-shadow 0.2s ease, transform 0.2s ease;
+                }
+                .card:hover {
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.04) !important;
+                    border-color: #D4D4D8 !important;
+                }
+
+                /* --- SOPHISTICATED BUTTONS --- */
+                /* Matte finish, rich color, soft colored shadow */
+                
+                sl-button::part(base) {
+                    background: #7C3AED !important; /* Solid Violet 600 */
+                    border: 1px solid transparent !important; /* Clean edges */
+                    
+                    color: white !important;
+                    font-weight: 500 !important; /* Medium weight is more premium than Bold */
+                    letter-spacing: -0.01em;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                    
+                    border-radius: 6px !important;
+                    
+                    /* The "Luxury" Touch: A soft, colored shadow glow */
+                    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25) !important;
+                    
+                    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+                }
+
+                /* Hover: Subtle Deepening & Lift */
+                sl-button::part(base):hover {
+                    background: #6D28D9 !important; /* Violet 700 */
+                    transform: translateY(-1px);
+                    box-shadow: 0 6px 16px rgba(124, 58, 237, 0.35) !important;
+                }
+
+                /* Active: Precise Press */
+                sl-button::part(base):active {
+                    transform: translateY(0px) scale(0.98) !important;
+                    background: #5B21B6 !important; /* Violet 800 */
+                    box-shadow: 0 2px 4px rgba(124, 58, 237, 0.15) !important;
+                }
+
+                /* Remove all pseudo-element animations for cleaner look */
+                sl-button::part(base)::before,
+                sl-button::part(base)::after {
+                    display: none !important;
+                }
+
+                /* Typography: High contrast, sharp */
+                h1, h2, h3 {
+                    color: #111827;
+                    font-weight: 700;
+                    letter-spacing: -0.02em;
+                }
+            """
+        },
+        'violit_dark': {
+            'mode': 'dark',
+            'primary': '#8B5CF6',
+            'secondary': '#6D28D9',
+            'success': '#34D399',
+            'warning': '#FBBF24',
+            'danger': '#F87171',
+            'bg': '#1e1b4b',          # Ultra Deep Indigo
+            'bg_card': '#312e81',     # Deep Indigo
+            'border': '#4c1d95',      # Violet 900
+            'text': '#ede9fe',        # Violet 50
+            'text_muted': '#a78bfa',
+            'radius': '3px',
+            'input_border_radius_small': '2px',
+            'input_border_radius_medium': '3px',
+            'input_border_radius_large': '4px',
+            'extra_css': """
+                body {
+                    background: radial-gradient(circle at 50% -20%, #4c1d95 0%, #1e1b4b 50%, #0f0a20 100%);
+                }
+                
+                .card {
+                    background: rgba(49, 46, 129, 0.4) !important;
+                    backdrop-filter: blur(12px) !important;
+                    border: 1px solid rgba(139, 92, 246, 0.3) !important;
+                    box-shadow: 
+                        0 0 20px rgba(139, 92, 246, 0.05),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+                }
+
+                /* Neon Facet Buttons */
+                sl-button::part(base) {
+                    background: transparent !important;
+                    border: 1px solid #8B5CF6 !important;
+                    color: #8B5CF6 !important;
+                    border-radius: 2px !important;
+                    box-shadow: 0 0 5px rgba(139, 92, 246, 0.2) !important;
+                    transition: all 0.2s ease !important;
+                    text-transform: uppercase;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                }
+
+                /* Hover: Fill with Light */
+                sl-button::part(base):hover {
+                    background: #8B5CF6 !important;
+                    color: white !important;
+                    box-shadow: 0 0 20px #8B5CF6, 0 0 40px rgba(139, 92, 246, 0.4) !important;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+                    transform: scale(1.02) !important;
+                    border-color: transparent !important;
+                }
+
+                /* Active */
+                sl-button::part(base):active {
+                    transform: scale(0.95) !important;
+                    box-shadow: 0 0 10px #8B5CF6 !important;
+                }
+
+                h1, h2, h3 {
+                   color: #ede9fe;
+                   text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+                }
+                
+                /* Inputs */
+                sl-input::part(base) {
+                    background: rgba(0,0,0,0.3) !important;
+                    border: 1px solid #4c1d95 !important;
+                }
+                sl-input::part(base):focus-within {
+                    border-color: #8B5CF6 !important;
+                    box-shadow: 0 0 10px rgba(139, 92, 246, 0.2) !important;
+                }
+            """
         }
     }
     

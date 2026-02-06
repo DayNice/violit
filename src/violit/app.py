@@ -286,9 +286,21 @@ class App(
         return State(name, default_value)
 
     def _get_next_cid(self, prefix: str) -> str:
-        """Generate next component ID"""
+        """Generate next component ID
+        
+        When inside a reactive block (If/For/reactivity), the block's ID is
+        prefixed to prevent ID collisions with external components.
+        """
         store = get_session_store()
-        cid = f"{prefix}_{store['component_count']}"
+        parent_ctx = rendering_ctx.get()
+        
+        # Check if we're inside a reactive block that needs namespacing
+        if parent_ctx and any(parent_ctx.startswith(p) for p in ('if_', 'for_', 'reactivity_')):
+            # Namespace the ID under the reactive block
+            cid = f"{parent_ctx}_{prefix}_{store['component_count']}"
+        else:
+            cid = f"{prefix}_{store['component_count']}"
+        
         store['component_count'] += 1
         return cid
 

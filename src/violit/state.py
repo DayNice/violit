@@ -23,13 +23,19 @@ def get_session_store():
         initial_theme = 'light'
         if app_instance_ref[0]:
             initial_theme = app_instance_ref[0].theme_manager.preset_name
+            # INHERIT component_count from static context (None) to avoid ID collisions
+            # Static components (created at import/init time) consume IDs starting from 0.
+            # Dynamic components (created in session) MUST start after them.
+            base_count = 0
+            if None in GLOBAL_STORE:
+                base_count = GLOBAL_STORE[None].get('component_count', 0)
             
         GLOBAL_STORE[sid] = {
             'states': {}, 
             'tracker': DependencyTracker(),
             'builders': {},
             'actions': {},
-            'component_count': 0,
+            'component_count': base_count,  # Start from where initial build left off
             'fragment_components': {},
             'order': [],
             'sidebar_order': [],

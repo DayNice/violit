@@ -13,6 +13,7 @@ import warnings
 import secrets
 import hmac
 import hashlib
+import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -1559,7 +1560,8 @@ class App(
                 self.lite_engine = LiteEngine()
 
         # Handle internal env var to force "Server Only" mode (for native reload)
-        if os.environ.get("VIOLIT_SERVER_ONLY"):
+        is_server_only = bool(os.environ.get("VIOLIT_SERVER_ONLY"))
+        if is_server_only:
             args.native = False
             
         # Hot Reload Manager Logic
@@ -1597,18 +1599,27 @@ class App(
             
             # Disable CSRF in native mode (local app security)
             self.csrf_enabled = False
-            print("[SECURITY] CSRF protection disabled (native mode)")
             
             # Use a shared flag to signal server shutdown
             server_shutdown = threading.Event()
             
+            @self.fastapi.on_event("startup")
+            async def _on_native_startup():
+                # "Uvicorn running on..." 메시지 + 403 Forbidden 필터링
+                class _SuppressUvicornRunningFilter(logging.Filter):
+                    def filter(self, record):
+                        return 'Uvicorn running on' not in record.getMessage()
+                
+                class _Suppress403Filter(logging.Filter):
+                    def filter(self, record):
+                        return '403' not in record.getMessage()
+                
+                logging.getLogger("uvicorn.error").addFilter(_SuppressUvicornRunningFilter())
+                logging.getLogger("uvicorn.access").addFilter(_Suppress403Filter())
+                print(f"INFO:     Violit desktop app running on port {args.port}")
+            
             def srv(): 
-                # Run uvicorn in a way we can control or just let it die with daemon
-                # Since we use daemon=True, it should die when main thread dies.
-                # However, sometimes keeping the main thread alive for webview.start() 
-                # might cause issues if not cleaned up properly.
-                # We'll stick to daemon=True but force exit after webview.start returns.
-                uvicorn.run(self.fastapi, host="127.0.0.1", port=args.port, log_level="warning")
+                uvicorn.run(self.fastapi, host="127.0.0.1", port=args.port)
             
             t = threading.Thread(target=srv, daemon=True)
             t.start()
@@ -1633,7 +1644,7 @@ class App(
             # Enable developer tools (when --debug flag is used)
             if args.debug:
                 start_args['debug'] = True
-                print("🔍 Debug mode enabled: Press F12 or Ctrl+Shift+I to open developer tools")
+                print("INFO:     Debug mode enabled: Press F12 or Ctrl+Shift+I to open developer tools")
             
             if 'icon' in sig_start.parameters and self.app_icon:
                 start_args['icon'] = self.app_icon
@@ -1645,7 +1656,31 @@ class App(
             # Force exit after window closes to kill the uvicorn thread immediately
             print("App closed. Exiting...")
             os._exit(0)
+        elif is_server_only:
+            # Native + reload 서브프로세스: 403 로그 억제 + 커스텀 메시지
+            @self.fastapi.on_event("startup")
+            async def _on_native_reload_startup():
+                # 403 Forbidden + "Uvicorn running on..." 필터링
+                class _SuppressForbiddenAndRunningFilter(logging.Filter):
+                    def filter(self, record):
+                        msg = record.getMessage()
+                        return '403' not in msg and 'Uvicorn running on' not in msg
+                logging.getLogger("uvicorn.access").addFilter(_SuppressForbiddenAndRunningFilter())
+                logging.getLogger("uvicorn.error").addFilter(_SuppressForbiddenAndRunningFilter())
+                print(f"INFO:     Violit desktop app running on port {args.port} (hot reload)")
+            uvicorn.run(self.fastapi, host="0.0.0.0", port=args.port)
         else:
+            # Web mode: 커스텀 startup 메시지
+            @self.fastapi.on_event("startup")
+            async def _on_web_startup():
+                # "Uvicorn running on..." 메시지 필터링
+                class _SuppressUvicornRunningFilter(logging.Filter):
+                    def filter(self, record):
+                        return 'Uvicorn running on' not in record.getMessage()
+                logging.getLogger("uvicorn.error").addFilter(_SuppressUvicornRunningFilter())
+                
+                reload_tag = " (hot reload)" if args.reload else ""
+                print(f"INFO:     Violit web app running on http://localhost:{args.port}{reload_tag}")
             uvicorn.run(self.fastapi, host="0.0.0.0", port=args.port)
 
 

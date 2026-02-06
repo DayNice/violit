@@ -659,6 +659,11 @@ class App(
                 elif callable(items):       # Lambda
                     current_items = items()
                 
+                # If current_items is an integer, convert to range
+                # This allows: app.For(count, render=...) where count is an int State
+                if isinstance(current_items, int):
+                    current_items = range(max(0, current_items))
+                
                 # Check if empty
                 if not current_items or len(current_items) == 0:
                     if actual_empty:

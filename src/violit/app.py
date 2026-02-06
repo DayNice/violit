@@ -16,6 +16,7 @@ import hashlib
 import logging
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 import inspect
 import uvicorn
@@ -158,11 +159,17 @@ class App(
 ):
     """Main Violit App class"""
     
-    def __init__(self, mode='ws', title="Violit App", theme='light', allow_selection=True, animation_mode='soft', icon=None, width=1024, height=768, on_top=True, container_width='800px'):
+    def __init__(self, mode='ws', title="Violit App", theme='light', allow_selection=True, animation_mode='soft', icon=None, width=1024, height=768, on_top=True, container_width='800px', use_cdn=False):
         self.mode = mode
+        self.use_cdn = use_cdn
         self.app_title = title  # Renamed to avoid conflict with title() method
         self.theme_manager = Theme(theme)
         self.fastapi = FastAPI()
+        
+        # Mount static files for offline support
+        static_path = Path(__file__).parent / "static"
+        if static_path.exists():
+            self.fastapi.mount("/static", StaticFiles(directory=static_path), name="static")
         
         # Debug mode: Check for --debug flag
         self.debug_mode = '--debug' in sys.argv
@@ -1136,7 +1143,32 @@ class App(
             # Debug flag injection
             debug_script = f'<script>window._debug_mode = {str(self.debug_mode).lower()};</script>'
             
-            html = HTML_TEMPLATE.replace("%CONTENT%", main_c).replace("%SIDEBAR_CONTENT%", sidebar_c).replace("%SIDEBAR_STYLE%", sidebar_style).replace("%MAIN_CLASS%", main_class).replace("%MODE%", self.mode).replace("%TITLE%", self.app_title).replace("%THEME_CLASS%", t.theme_class).replace("%CSS_VARS%", t.to_css_vars()).replace("%SPLASH%", self._splash_html if self.show_splash else "").replace("%CONTAINER_MAX_WIDTH%", self.container_max_width).replace("%CSRF_SCRIPT%", csrf_script).replace("%DEBUG_SCRIPT%", debug_script)
+            # Vendor Resources Selection
+            if self.use_cdn:
+                vendor_resources = """
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/dark.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+                """
+            else:
+                # Local/Offline Mode
+                # Note: Shoelace autoloader might need full assets for some components.
+                # Basic components should work with the downloaded files.
+                vendor_resources = """
+    <link rel="stylesheet" href="/static/vendor/shoelace/themes/light.css" />
+    <link rel="stylesheet" href="/static/vendor/shoelace/themes/dark.css" />
+    <script type="module" src="/static/vendor/shoelace/shoelace-autoloader.js"></script>
+    <script src="/static/vendor/htmx/htmx.min.js"></script>
+    <script src="/static/vendor/ag-grid/ag-grid-community.min.js"></script>
+    <script src="/static/vendor/plotly/plotly-2.27.0.min.js"></script>
+    <!-- Fonts: Inter (skipped in offline mode to avoid external requests) -->
+                """
+
+            html = HTML_TEMPLATE.replace("%CONTENT%", main_c).replace("%SIDEBAR_CONTENT%", sidebar_c).replace("%SIDEBAR_STYLE%", sidebar_style).replace("%MAIN_CLASS%", main_class).replace("%MODE%", self.mode).replace("%TITLE%", self.app_title).replace("%THEME_CLASS%", t.theme_class).replace("%CSS_VARS%", t.to_css_vars()).replace("%SPLASH%", self._splash_html if self.show_splash else "").replace("%CONTAINER_MAX_WIDTH%", self.container_max_width).replace("%CSRF_SCRIPT%", csrf_script).replace("%DEBUG_SCRIPT%", debug_script).replace("%VENDOR_RESOURCES%", vendor_resources)
             return HTMLResponse(html)
 
         @self.fastapi.post("/action/{cid}")
@@ -1549,6 +1581,13 @@ class App(
             
             # Apply filter to uvicorn.access logger
             logging.getLogger("uvicorn.access").addFilter(PollingFilter())
+            
+            # [Logging Filter] Suppress static vendor file logs unless in debug mode
+            if not args.debug:
+                class StaticResourceFilter(logging.Filter):
+                    def filter(self, record: logging.LogRecord) -> bool:
+                        return "/static/vendor/" not in record.getMessage()
+                logging.getLogger("uvicorn.access").addFilter(StaticResourceFilter())
         except Exception:
             pass # Ignore if logging setup fails
 
@@ -1694,13 +1733,7 @@ HTML_TEMPLATE = """
     <title>%TITLE%</title>
     %CSRF_SCRIPT%
     %DEBUG_SCRIPT%
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/dark.css" />
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.0/dist/ag-grid-community.min.js"></script>
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    %VENDOR_RESOURCES%
     <style>
         :root { 
             %CSS_VARS%

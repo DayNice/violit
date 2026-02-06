@@ -536,30 +536,30 @@ class CardContext:
         self.components = []
     
     def __enter__(self):
-        from ..context import layout_ctx
-        self.token = layout_ctx.set(f"card_{self.cid}")
+        from ..context import layout_ctx, fragment_ctx
+        self.layout_token = layout_ctx.set(f"card_{self.cid}")
+        self.fragment_token = fragment_ctx.set(self.cid)
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        from ..context import layout_ctx
+        from ..context import layout_ctx, fragment_ctx
         from ..state import get_session_store
         
-        # Collect all components added inside this context
-        store = get_session_store()
-        card_components = []
-        
-        # Get components that were added in this context
-        for comp_cid in store['order']:
-            if comp_cid.startswith(f"card_{self.cid}") or len(card_components) > 0:
-                builder = store['builders'].get(comp_cid) or self.app.static_builders.get(comp_cid)
-                if builder:
-                    card_components.append(builder().render())
-        
-        # Build final card HTML
+        # Build final card HTML - collect components at render time
         def builder():
+            store = get_session_store()
             token = rendering_ctx.set(self.cid)
             
             try:
+                # Collect components added inside this card context
+                card_components = []
+                # Check static fragment components
+                for cid_child, b in self.app.static_fragment_components.get(self.cid, []):
+                    card_components.append(b().render())
+                # Check session fragment components
+                for cid_child, b in store['fragment_components'].get(self.cid, []):
+                    card_components.append(b().render())
+                
                 # Handle callable header and footer (Lambda support)
                 current_header = self.header
                 if callable(self.header):
@@ -591,5 +591,6 @@ class CardContext:
                 rendering_ctx.reset(token)
         
         self.app._register_component(self.cid, builder)
-        layout_ctx.reset(self.token)
+        fragment_ctx.reset(self.fragment_token)
+        layout_ctx.reset(self.layout_token)
 

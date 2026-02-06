@@ -21,14 +21,16 @@ def get_session_store():
     sid = session_ctx.get()
     if sid not in GLOBAL_STORE:
         initial_theme = 'light'
+        base_count = 0  # Initialize before conditional block
+        
         if app_instance_ref[0]:
             initial_theme = app_instance_ref[0].theme_manager.preset_name
-            # INHERIT component_count from static context (None) to avoid ID collisions
-            # Static components (created at import/init time) consume IDs starting from 0.
-            # Dynamic components (created in session) MUST start after them.
-            base_count = 0
-            if None in GLOBAL_STORE:
-                base_count = GLOBAL_STORE[None].get('component_count', 0)
+        
+        # INHERIT component_count from static context (None) to avoid ID collisions
+        # Static components (created at import/init time) consume IDs starting from 0.
+        # Dynamic components (created in session) MUST start after them.
+        if None in GLOBAL_STORE:
+            base_count = GLOBAL_STORE[None].get('component_count', 0)
             
         GLOBAL_STORE[sid] = {
             'states': {}, 

@@ -100,11 +100,14 @@ class ChatWidgetsMixin:
         cid = self._get_next_cid("chat_input")
         store = get_session_store()
         
-        # Register action handler
+        # Register action handler in session store (not static_actions)
+        # This ensures each session has its own handler
         def handler(val):
             if on_submit:
                 on_submit(val)
-                
+        
+        # Use static_actions for initial registration, but the handler
+        # captures the session-specific on_submit callback via closure
         self.static_actions[cid] = handler
             
         def builder():

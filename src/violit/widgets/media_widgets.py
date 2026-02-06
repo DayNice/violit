@@ -34,7 +34,7 @@ class MediaWidgetsMixin:
                                 mime_types = {'.jpg': 'jpeg', '.jpeg': 'jpeg', '.png': 'png', '.gif': 'gif', '.webp': 'webp'}
                                 mime = mime_types.get(ext, 'png')
                                 img_src = f"data:image/{mime};base64,{img_base64}"
-                    except:
+                    except Exception:
                         img_src = image  # Fallback to treating as URL
             elif hasattr(image, 'read'):
                 # File-like object
@@ -58,7 +58,7 @@ class MediaWidgetsMixin:
                     buf.seek(0)
                     img_base64 = base64.b64encode(buf.read()).decode('utf-8')
                     img_src = f"data:image/png;base64,{img_base64}"
-                except:
+                except Exception:
                     img_src = str(image)
             
             # Build image HTML
@@ -102,7 +102,7 @@ class MediaWidgetsMixin:
                                 audio_data = f.read()
                                 audio_base64 = base64.b64encode(audio_data).decode('utf-8')
                                 audio_src = f"data:{format};base64,{audio_base64}"
-                    except:
+                    except Exception:
                         audio_src = audio
             elif hasattr(audio, 'read'):
                 audio_data = audio.read()
@@ -120,7 +120,7 @@ class MediaWidgetsMixin:
                     buf.seek(0)
                     audio_base64 = base64.b64encode(buf.read()).decode('utf-8')
                     audio_src = f"data:audio/wav;base64,{audio_base64}"
-                except:
+                except Exception:
                     audio_src = str(audio)
             
             html = f'''
@@ -153,7 +153,7 @@ class MediaWidgetsMixin:
                                 video_data = f.read()
                                 video_base64 = base64.b64encode(video_data).decode('utf-8')
                                 video_src = f"data:{format};base64,{video_base64}"
-                    except:
+                    except Exception:
                         video_src = video
             elif hasattr(video, 'read'):
                 video_data = video.read()

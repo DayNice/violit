@@ -69,27 +69,15 @@ class ListWidgetsMixin:
                  reverse: bool = True):
         """Reactive list for card items"""
         def render_card(item):
-            if card_type == 'live':
-                return self.live_card_html(
-                    item.get('content', ''),
-                    item.get('created_at'),
-                    item.get('id')
-                )
-            elif card_type == 'admin':
-                card_html = f'<div data-post-id="{item.get("id")}">'
-                card_html += self.live_card_html(
-                    item.get('content', ''),
-                    item.get('created_at'),
-                    item.get('id')
-                )
-                card_html += '</div>'
-                return card_html
-            else:
-                return self.live_card_html(
-                    item.get('content', ''),
-                    item.get('created_at'),
-                    item.get('id')
-                )
+            # Use styled_card with return_html=True to get HTML string
+            return self.styled_card(
+                content=item.get('content', ''),
+                style=card_type,
+                header_badge='LIVE' if card_type == 'live' else f'#{item.get("id", "")}',
+                footer_text=item.get('created_at'),
+                data_id=item.get('id'),
+                return_html=True
+            )
         
         return self.reactive_list(
             items=items,

@@ -1707,21 +1707,47 @@ class App(
         
         self.show_splash = not args.nosplash
         if self.show_splash:
-            self._splash_html = """
-            <div id="splash" style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--sl-bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.4s ease;">
-                <sl-spinner style="font-size: 3rem; --indicator-color: var(--sl-primary); margin-bottom: 1rem;"></sl-spinner>
-                <div style="font-size:1.5rem;font-weight:600;color:var(--sl-text);" class="gradient-text">Loading...</div>
+            self._splash_html = f"""
+            <div id="splash" style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--sl-bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);">
+                <sl-spinner style="font-size: 3rem; --indicator-color: var(--sl-primary); --track-color: var(--sl-border); margin-bottom: 1.25rem;"></sl-spinner>
+                <div style="font-size:1.25rem;font-weight:600;color:var(--sl-text);letter-spacing:-0.02em;" class="gradient-text">Violit is loading...</div>
             </div>
             <script>
-            window.addEventListener('load', ()=>{ 
-                setTimeout(()=>{
-                    const s=document.getElementById('splash');
-                    if(s){
-                        s.style.opacity=0;
-                        setTimeout(()=>s.remove(), 400);
-                    }
-                }, 800); 
-            });
+            (function() {{
+                const splash = document.getElementById('splash');
+                let loaded = false;
+                let wsReady = ("{self.mode}" !== "ws");
+                
+                const hideSplash = () => {{
+                    if (loaded && wsReady && splash) {{
+                        splash.style.opacity = '0';
+                        splash.style.pointerEvents = 'none';
+                        setTimeout(() => splash.remove(), 600);
+                    }}
+                }};
+
+                window.addEventListener('load', () => {{ 
+                    loaded = true; 
+                    hideSplash(); 
+                }});
+                
+                if ("{self.mode}" === "ws") {{
+                    const checkWS = setInterval(() => {{
+                        if (window._wsReady) {{
+                            wsReady = true;
+                            clearInterval(checkWS);
+                            hideSplash();
+                        }}
+                    }}, 30);
+                }}
+                
+                // Fail-safe: Maximum 3 seconds
+                setTimeout(() => {{ 
+                    loaded = true; 
+                    wsReady = true; 
+                    hideSplash(); 
+                }}, 3000);
+            }})();
             </script>
             """
         

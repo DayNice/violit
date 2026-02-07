@@ -2028,6 +2028,9 @@ HTML_TEMPLATE = """
             h2 { font-size: 1.3rem !important; }
             h3 { font-size: 1.1rem !important; }
             
+            /* Images & videos: prevent overflow */
+            img, video, iframe { max-width: 100%; height: auto; }
+            
             /* Code blocks: prevent horizontal overflow */
             pre, .code-block { overflow-x: auto; max-width: 100%; }
             

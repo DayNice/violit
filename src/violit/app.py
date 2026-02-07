@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Union
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.gzip import GZipMiddleware
 import inspect
 import uvicorn
 import webview
@@ -165,6 +166,7 @@ class App(
         self.app_title = title  # Renamed to avoid conflict with title() method
         self.theme_manager = Theme(theme)
         self.fastapi = FastAPI()
+        self.fastapi.add_middleware(GZipMiddleware, minimum_size=1000)
         
         # Mount static files for offline support
         static_path = Path(__file__).parent / "static"
@@ -1822,6 +1824,11 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="htmx-config" content='{"defaultSwapDelay":0,"defaultSettleDelay":0}'>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.plot.ly">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <title>%TITLE%</title>
     %CSRF_SCRIPT%
     %DEBUG_SCRIPT%

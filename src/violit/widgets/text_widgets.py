@@ -546,7 +546,39 @@ class TextWidgetsMixin:
             pre_radius = "0" if showcase else "0.625rem"
             outer_radius = "0.625rem"
             
+            # Scrollbar colors based on theme
+            if theme == "light":
+                sb_thumb = "rgba(0, 0, 0, 0.15)"
+                sb_thumb_hover = "rgba(0, 0, 0, 0.3)"
+            else:
+                sb_thumb = "rgba(255, 255, 255, 0.15)"
+                sb_thumb_hover = "rgba(255, 255, 255, 0.3)"
+
+            scrollbar_style = f'''
+            <style>
+            .violit-code-block.{hljs_theme_class} *::-webkit-scrollbar {{
+                height: 6px;
+                width: 6px;
+            }}
+            .violit-code-block.{hljs_theme_class} *::-webkit-scrollbar-track {{
+                background: transparent;
+            }}
+            .violit-code-block.{hljs_theme_class} *::-webkit-scrollbar-thumb {{
+                background-color: {sb_thumb};
+                border-radius: 99px;
+                transition: background-color 0.2s;
+            }}
+            .violit-code-block.{hljs_theme_class} *::-webkit-scrollbar-thumb:hover {{
+                background-color: {sb_thumb_hover};
+            }}
+            .violit-code-block.{hljs_theme_class} *::-webkit-scrollbar-corner {{
+                background: transparent;
+            }}
+            </style>
+            '''
+            
             html_output = f'''
+            {scrollbar_style}
             <div class="violit-code-block {hljs_theme_class}" style="
                 position: relative; border-radius: {outer_radius};
                 overflow: hidden; border: 1px solid {border_color};

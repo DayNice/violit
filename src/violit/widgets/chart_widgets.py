@@ -143,8 +143,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, mode='lines+markers', name=trace_name))
+            trace_cls = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(trace_cls(x=x_data, y=y_data, mode='lines+markers', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),
@@ -198,8 +198,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, fill='tozeroy', name=trace_name))
+            trace_cls = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(trace_cls(x=x_data, y=y_data, fill='tozeroy', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),
@@ -226,8 +226,8 @@ class ChartWidgetsMixin:
             x_data, y_data, trace_name = self._parse_chart_data(data, x, y)
             
             fig = go.Figure()
-            cls = go.Scattergl if render_mode == "webgl" else go.Scatter
-            fig.add_trace(cls(x=x_data, y=y_data, mode='markers', name=trace_name))
+            trace_cls = go.Scattergl if render_mode == "webgl" else go.Scatter
+            fig.add_trace(trace_cls(x=x_data, y=y_data, mode='markers', name=trace_name))
             fig.update_layout(
                 height=height,
                 margin=dict(l=0, r=0, t=30, b=0),

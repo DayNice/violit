@@ -43,17 +43,16 @@ class LayoutWidgetsMixin:
                 for cid, b in store['fragment_components'].get(col_id, []):
                     col_content.append(b().render())
                 
-                # Apply Flexbox Centering to each column item
-                # justify-content: center (horizontal), align-items: center (vertical)
-                # height: 100% ensures vertical centering works if heights differ
+                # Use CSS class instead of inline style for column-item
                 columns_html.append(
-                    f'<div class="column-item" style="display: flex; flex-direction: column; justify-content: center; height: 100%;">'
+                    f'<div class="column-item">'
                     f'{"".join(col_content)}</div>'
                 )
             
             grid_tmpl = " ".join(weights)
-            # align-items: stretch ensures all columns have equal height
-            container_html = f'<div id="{columns_id}" class="columns" style="display: grid; grid-template-columns: {grid_tmpl}; gap: {gap}; align-items: stretch;">{"".join(columns_html)}</div>'
+            # Use CSS variable for grid-template-columns so it can be overridden by CSS
+            # The --vl-cols variable and gap are set inline, but display:grid is handled by CSS class
+            container_html = f'<div id="{columns_id}" class="columns" style="--vl-cols: {grid_tmpl}; --vl-gap: {gap};">{"".join(columns_html)}</div>'
             _wd = self._get_widget_defaults("columns")
             _fc = merge_cls(_wd.get("cls", ""), cls)
             _fs = merge_style(_wd.get("style", ""), style)

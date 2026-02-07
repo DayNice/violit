@@ -1825,8 +1825,8 @@ HTML_TEMPLATE = """
     %CSRF_SCRIPT%
     %DEBUG_SCRIPT%
     %VENDOR_RESOURCES%
-    %USER_CSS%
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :root { 
             %CSS_VARS%
             --sidebar-width: 300px;
@@ -1920,8 +1920,21 @@ HTML_TEMPLATE = """
             width: 100%; 
         }
         
-        /* Column layouts */
-        .columns { display: flex; gap: 1rem; width: 100%; margin-bottom: 0.5rem; }
+        /* Column layouts - using CSS variables for flexible override */
+        .columns { 
+            display: grid; 
+            grid-template-columns: var(--vl-cols, 1fr 1fr); 
+            gap: var(--vl-gap, 1rem); 
+            align-items: stretch;
+            width: 100%; 
+            margin-bottom: 0.5rem; 
+        }
+        .column-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
+        }
         .column { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
         
         /* List container - predefined layout for reactive lists */
@@ -1972,6 +1985,17 @@ HTML_TEMPLATE = """
         
         /* ===== Mobile Responsive ===== */
         @media (max-width: 768px) {
+            /* Prevent horizontal scroll at root level */
+            html, body { overflow-x: hidden; }
+            
+            /* Force text wrapping on mobile */
+            body {
+                font-size: 17px !important;
+                line-height: 1.7 !important;
+                overflow-wrap: break-word;
+                word-wrap: break-word;
+            }
+            
             /* Sidebar: off-canvas overlay on mobile */
             #sidebar {
                 width: 280px !important;
@@ -2009,11 +2033,21 @@ HTML_TEMPLATE = """
             #main {
                 margin-left: 0 !important;
                 padding: 0 1rem 2rem 1rem !important;
+                max-width: 100vw;
+            }
+            
+            /* App container: constrain width, less gap */
+            #app {
+                gap: 1rem;
+                max-width: 100%;
             }
             
             /* Columns: stack vertically on mobile */
             .columns {
                 grid-template-columns: 1fr !important;
+            }
+            .column-item {
+                height: auto !important;
             }
             
             /* Chat input: full width on mobile */
@@ -2023,27 +2057,33 @@ HTML_TEMPLATE = """
             }
             
             /* Typography: improve readability on mobile */
-            body { font-size: 17px !important; line-height: 1.7 !important; }
             h1 { font-size: 1.75rem !important; }
             h2 { font-size: 1.3rem !important; }
             h3 { font-size: 1.1rem !important; }
+            p, span, div, li { overflow-wrap: break-word; word-wrap: break-word; }
             
             /* Images & videos: prevent overflow */
             img, video, iframe { max-width: 100%; height: auto; }
             
-            /* Code blocks: prevent horizontal overflow */
+            /* Code blocks: constrain to viewport */
+            .violit-code-block { max-width: calc(100vw - 2rem); overflow: hidden; }
             pre, .code-block { overflow-x: auto; max-width: 100%; }
+            pre { font-size: 0.82rem !important; }
             
             /* Cards: tighter padding on mobile */
             .card { padding: 1rem; }
             
-            /* App container: less gap */
-            #app { gap: 1rem; }
-            
             /* Table: horizontal scroll wrapper */
-            .ag-theme-alpine, .ag-theme-alpine-dark {
+            .ag-theme-alpine, .ag-theme-alpine-dark, table {
+                display: block;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                max-width: 100%;
+            }
+            
+            /* Ensure minimum readable font size for small text */
+            .page-container p, .page-container span, .page-container div {
+                font-size: max(0.9rem, inherit);
             }
             
             /* Hide hamburger when no sidebar content */
@@ -2052,6 +2092,7 @@ HTML_TEMPLATE = """
             }
         }
     </style>
+    %USER_CSS%
     <script>
         const mode = "%MODE%";
         

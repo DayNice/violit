@@ -15,22 +15,41 @@ class DependencyTracker:
     def get_dirty_components(self, state_name: str) -> Set[str]:
         return self.subscribers.get(state_name, set())
 
+# Persistent store for static components (created during app initialization)
+STATIC_STORE = {}
+# TTL-cached store for user sessions (expires after 1800s of inactivity)
 GLOBAL_STORE = TTLCache(maxsize=1000, ttl=1800)
 
 def get_session_store():
     sid = session_ctx.get()
+    
+    # Static context (initial build)
+    if sid is None:
+        if not STATIC_STORE:
+            initial_theme = 'light'
+            if app_instance_ref[0]:
+                initial_theme = app_instance_ref[0].theme_manager.preset_name
+            
+            STATIC_STORE.update({
+                'states': {}, 
+                'tracker': DependencyTracker(),
+                'builders': {},
+                'actions': {},
+                'component_count': 0,
+                'fragment_components': {},
+                'order': [],
+                'sidebar_order': [],
+                'theme': Theme(initial_theme)
+            })
+        return STATIC_STORE
+        
+    # User Session context
     if sid not in GLOBAL_STORE:
         initial_theme = 'light'
-        base_count = 0  # Initialize before conditional block
+        base_count = STATIC_STORE.get('component_count', 0)
         
         if app_instance_ref[0]:
             initial_theme = app_instance_ref[0].theme_manager.preset_name
-        
-        # INHERIT component_count from static context (None) to avoid ID collisions
-        # Static components (created at import/init time) consume IDs starting from 0.
-        # Dynamic components (created in session) MUST start after them.
-        if None in GLOBAL_STORE:
-            base_count = GLOBAL_STORE[None].get('component_count', 0)
             
         GLOBAL_STORE[sid] = {
             'states': {}, 

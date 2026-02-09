@@ -46,7 +46,7 @@ Violit and Streamlit are similar in that they build UIs with Python code, but th
 | **Performance** | Response speed may degrade as data size increases. | Maintains consistent reactivity regardless of data scale. |
 | **Optimization** | Requires optimization decorators like `@cache`, `@fragment`. | Optimized by design without extra optimization code. |
 | **Deployment** | Optimized for web browser execution. | Supports both Web Browser and **Desktop Native App** modes. |
-| **Design** | Focuses on providing basic UI. | Provides ready-to-use designs with **30+ professional themes**. |
+| **Design** | Focuses on providing basic UI. | Provides ready-to-use designs with **20+ professional themes**. |
 
 ### Key Features
 
@@ -68,7 +68,7 @@ Violit and Streamlit are similar in that they build UIs with Python code, but th
 
 ## 🎨 Theme Gallery
 
-You don't need to know CSS at all. Violit provides over 30 themes. (Soon, users will be able to easily add Custom Themes.)
+You don't need to know CSS at all. Violit provides over 20 themes. (Soon, users will be able to easily add Custom Themes.)
 
 *Theme demo will be updated soon.*
 

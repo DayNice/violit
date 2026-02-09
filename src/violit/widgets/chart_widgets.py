@@ -65,7 +65,7 @@ _PLOTLY_RENDER_SCRIPT = """
 """
 
 # Threshold for asynchronous data loading (number of data points)
-# Large figures are deferred until the page is loaded to ensure O(1) initial page load
+# Large figures are deferred until the page is loaded to ensure fine-grained reactivity initial page load
 _ASYNC_CHART_THRESHOLD = 50000
 
 

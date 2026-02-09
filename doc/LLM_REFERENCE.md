@@ -481,7 +481,7 @@ app.run()
 | Input return | `val = st.text_input()` (str) | `val = app.text_input()` (State) | |
 | Rerun | `st.rerun()` | Not needed | Auto partial update |
 | Cache | `@st.cache_data` | Not needed | No full rerun |
-| Fragment | `@st.fragment` | Not needed | O(1) by design |
+| Fragment | `@st.fragment` | Not needed | Fine-grained reactivity by design |
 | Key | `st.button("X", key="k")` | Usually not needed | Auto-generated |
 | Sidebar | `st.sidebar.xxx()` | `with app.sidebar: app.xxx()` | Context manager |
 | Pages | `st.Page` in `st.navigation` | `vl.Page` in `app.navigation` | |

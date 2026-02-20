@@ -905,9 +905,10 @@ class App(
     def _get_dirty_rendered(self):
         """Get components that need updating"""
         store = get_session_store()
+        tracker = store['tracker']
         dirty_states = store.get('dirty_states', set())
         aff = set()
-        for s in dirty_states: aff.update(store['tracker'].get_dirty_components(s))
+        for s in dirty_states: aff.update(tracker.get_dirty_components(s))
         
         # [NEW] Handle forced dirty components (async data loading)
         forced = store.get('forced_dirty', set())
@@ -921,7 +922,16 @@ class App(
         for cid in aff:
             builder = store['builders'].get(cid) or self.static_builders.get(cid)
             if builder:
+                # Clear stale subscriptions before re-rendering so that:
+                # 1. Dependencies that are no longer read get removed.
+                # 2. The upcoming builder() call re-registers only current deps.
+                tracker.unregister_component(cid)
                 res.append(builder())
+            else:
+                # Component is permanently gone (e.g. navigation page switch,
+                # If-block condition flip).  Clean it from the tracker so it
+                # never appears in future dirty sets.
+                tracker.unregister_component(cid)
         return res
 
     # Theme and settings methods

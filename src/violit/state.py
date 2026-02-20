@@ -15,6 +15,22 @@ class DependencyTracker:
     def get_dirty_components(self, state_name: str) -> Set[str]:
         return self.subscribers.get(state_name, set())
 
+    def unregister_component(self, component_id: str):
+        """Remove a component from all subscriber sets.
+
+        Call this before re-rendering a component (so stale deps are cleared
+        and fresh ones are registered by the upcoming builder() call), or when
+        a component is permanently gone (builder lookup returned None).
+        Empty subscriber sets are pruned to prevent dict bloat.
+        """
+        empty_keys = []
+        for state_name, cids in self.subscribers.items():
+            cids.discard(component_id)
+            if not cids:
+                empty_keys.append(state_name)
+        for k in empty_keys:
+            del self.subscribers[k]
+
 # Persistent store for static components (created during app initialization)
 STATIC_STORE = {}
 # TTL-cached store for user sessions (expires after 1800s of inactivity)

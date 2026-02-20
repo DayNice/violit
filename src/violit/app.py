@@ -252,6 +252,55 @@ class App(
         self.height = height
         self.on_top = on_top
         
+        # Determine if splash should be shown by default. 
+        # The run() method will set VIOLIT_NOSPLASH="1" if --nosplash is passed,
+        # which will be safely inherited by Uvicorn worker child processes.
+        self.show_splash = not bool(os.environ.get("VIOLIT_NOSPLASH", False))
+        
+        self._splash_html = f"""
+        <div id="splash" style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--sl-bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);">
+            <sl-spinner style="font-size: 3rem; --indicator-color: var(--sl-primary); --track-color: var(--sl-border); margin-bottom: 1.25rem;"></sl-spinner>
+            <div style="font-size:1.25rem;font-weight:600;color:var(--sl-text);letter-spacing:-0.02em;" class="gradient-text">Loading...</div>
+        </div>
+        <script>
+        (function() {{
+            const splash = document.getElementById('splash');
+            let loaded = false;
+            let wsReady = ("{self.mode}" !== "ws");
+            
+            const hideSplash = () => {{
+                if (loaded && wsReady && splash) {{
+                    splash.style.opacity = '0';
+                    splash.style.pointerEvents = 'none';
+                    setTimeout(() => splash.remove(), 600);
+                }}
+            }};
+
+            window.addEventListener('load', () => {{ 
+                loaded = true; 
+                hideSplash(); 
+            }});
+            
+            if ("{self.mode}" === "ws") {{
+                const checkWS = setInterval(() => {{
+                    if (window._wsReady) {{
+                        wsReady = true;
+                        clearInterval(checkWS);
+                        hideSplash();
+                    }}
+                }}, 30);
+            }}
+            
+            // Fail-safe: Maximum 3 seconds
+            setTimeout(() => {{ 
+                loaded = true; 
+                wsReady = true; 
+                hideSplash(); 
+            }}, 3000);
+        }})();
+        </script>
+        """ if self.show_splash else ""
+
         # Container width: numeric (px), percentage (%), or 'none' (full width)
         if container_width == 'none' or container_width == '100%':
             self.container_max_width = 'none'
@@ -1694,54 +1743,65 @@ class App(
                     session_ctx.reset(t)
 
     def _run_web_reload(self, args):
-        """Run with hot reload in web mode (process restart)"""
-        self.debug_print(f"[HOT RELOAD] Watching {os.getcwd()}...")
+        """Run with hot reload in web mode using uvicorn's native reload"""
+        import inspect
+        import uvicorn
         
-        iteration = 0
-        while True:
-            iteration += 1
-            # Prepare environment
-            env = os.environ.copy()
-            env["VIOLIT_WORKER"] = "1"
+        self.debug_print(f"[HOT RELOAD] Starting with uvicorn native reload...")
+        
+        # Trace back to find the caller's module and variable name
+        frame = inspect.currentframe()
+        app_var_name = None
+        module_string = None
+        file_path = None
+        
+        try:
+            while frame:
+                if frame.f_code.co_name == "<module>":
+                    file_path = frame.f_globals.get("__file__")
+                    if file_path:
+                        # Convert filepath to module string (e.g. "my_app")
+                        module_string = os.path.splitext(os.path.basename(file_path))[0]
+                        
+                        # Find the variable holding this App instance
+                        for name, obj in frame.f_globals.items():
+                            if obj is self:
+                                app_var_name = name
+                                break
+                        
+                        if app_var_name:
+                            break
+                frame = frame.f_back
+        finally:
+            del frame
             
-            # Start worker
-            self.debug_print(f"\n[Web Reload] Starting server (iteration {iteration})...", flush=True)
-            p = subprocess.Popen([sys.executable] + sys.argv, env=env)
+        if app_var_name and module_string:
+            uvicorn_target = f"{module_string}:{app_var_name}.fastapi"
+            self.debug_print(f"[HOT RELOAD] Delegating to uvicorn -> {uvicorn_target}")
             
-            # Watch for changes
-            watcher = FileWatcher(debug_mode=self.debug_mode)
-            intentional_restart = False
+            # Use uvicorn's run with reload=True
+            reload_dir = os.path.dirname(os.path.abspath(file_path)) if file_path else os.getcwd()
+            
+            # Must set VIOLIT_WORKER so that the child workers don't hit this block again
+            os.environ["VIOLIT_WORKER"] = "1"
             
             try:
-                while p.poll() is None:
-                    if watcher.check():
-                        self.debug_print("\n[Web Reload] 🔄 Reloading server...", flush=True)
-                        intentional_restart = True
-                        p.terminate()
-                        try:
-                            p.wait(timeout=2)
-                            self.debug_print("[Web Reload] ✓ Server stopped gracefully", flush=True)
-                        except subprocess.TimeoutExpired:
-                            self.debug_print("[Web Reload] WARNING: Force killing server...", flush=True)
-                            p.kill()
-                            p.wait()
-                        break
-                    time.sleep(0.5)
-            except KeyboardInterrupt:
-                p.terminate()
-                sys.exit(0)
-            
-            # If it was an intentional restart, wait a bit so browser can detect server is down
-            if intentional_restart:
-                time.sleep(1.5)  # Give browser time to detect server is down (increased for reliability)
-                continue
-            
-            # If process exited unexpectedly (crashed), wait for file change
-            if p.returncode is not None:
-                self.debug_print("[Web Reload] WARNING: Server exited unexpectedly. Waiting for file changes...", flush=True)
-                while not watcher.check():
-                    time.sleep(0.5)
-                self.debug_print("[Web Reload] Reloading after crash...", flush=True)
+                uvicorn.run(
+                    uvicorn_target,
+                    host="0.0.0.0",
+                    port=args.port,
+                    reload=True,
+                    reload_dirs=[reload_dir],
+                    reload_includes=["*.py"], # 속도 확보를 위해 py 확장자만 감시
+                    reload_delay=0.1  # Reduce watch delay from 0.25s (default) to 0.1s
+                )
+            except Exception as e:
+                self.debug_print(f"[HOT RELOAD] Failed to start uvicorn: {e}")
+                sys.exit(1)
+        else:
+            self.debug_print("[HOT RELOAD ERROR] Could not dynamically resolve App instance name.")
+            self.debug_print("Make sure your App instance is stored in a global variable in the main module.")
+            sys.exit(1)
 
     def _run_native_reload(self, args):
         """Run with hot reload in desktop mode"""
@@ -1934,6 +1994,9 @@ class App(
         if is_server_only:
             args.native = False
             
+        if args.nosplash:
+            os.environ["VIOLIT_NOSPLASH"] = "1"
+            
         # Hot Reload Manager Logic
         if args.reload and not os.environ.get("VIOLIT_WORKER"):
             if args.native:
@@ -1942,52 +2005,8 @@ class App(
                 self._run_web_reload(args)
             return
         
-        self.show_splash = not args.nosplash
-        if self.show_splash:
-            self._splash_html = f"""
-            <div id="splash" style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--sl-bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);">
-                <sl-spinner style="font-size: 3rem; --indicator-color: var(--sl-primary); --track-color: var(--sl-border); margin-bottom: 1.25rem;"></sl-spinner>
-                <div style="font-size:1.25rem;font-weight:600;color:var(--sl-text);letter-spacing:-0.02em;" class="gradient-text">Loading...</div>
-            </div>
-            <script>
-            (function() {{
-                const splash = document.getElementById('splash');
-                let loaded = false;
-                let wsReady = ("{self.mode}" !== "ws");
-                
-                const hideSplash = () => {{
-                    if (loaded && wsReady && splash) {{
-                        splash.style.opacity = '0';
-                        splash.style.pointerEvents = 'none';
-                        setTimeout(() => splash.remove(), 600);
-                    }}
-                }};
+        # Splash screen logic is already initialized in __init__ using OS environment vars
 
-                window.addEventListener('load', () => {{ 
-                    loaded = true; 
-                    hideSplash(); 
-                }});
-                
-                if ("{self.mode}" === "ws") {{
-                    const checkWS = setInterval(() => {{
-                        if (window._wsReady) {{
-                            wsReady = true;
-                            clearInterval(checkWS);
-                            hideSplash();
-                        }}
-                    }}, 30);
-                }}
-                
-                // Fail-safe: Maximum 3 seconds
-                setTimeout(() => {{ 
-                    loaded = true; 
-                    wsReady = true; 
-                    hideSplash(); 
-                }}, 3000);
-            }})();
-            </script>
-            """
-        
         if args.native:
             # Generate security token for native mode
             self.native_token = secrets.token_urlsafe(32)
@@ -2591,6 +2610,9 @@ HTML_TEMPLATE = """
                 window._wsReady = false;
                 debugLog("🔌 Connection lost. Auto-reloading...");
 
+                let retryDelay = 50;
+                const maxDelay = 2000;
+                
                 const checkServer = () => {
                    fetch(location.href)
                        .then(r => {
@@ -2598,12 +2620,16 @@ HTML_TEMPLATE = """
                                debugLog("✓ Server back online. Reloading...");
                                window.location.reload();
                            } else {
-                               setTimeout(checkServer, 300);
+                               retryDelay = Math.min(retryDelay * 1.5, maxDelay);
+                               setTimeout(checkServer, retryDelay);
                            }
                        })
-                       .catch(() => setTimeout(checkServer, 300));
+                       .catch(() => {
+                           retryDelay = Math.min(retryDelay * 1.5, maxDelay);
+                           setTimeout(checkServer, retryDelay);
+                       });
                 };
-                setTimeout(checkServer, 300);
+                setTimeout(checkServer, retryDelay);
             };
             
             // CRITICAL: Restore from hash ONLY after WebSocket is connected

@@ -265,10 +265,28 @@ class StatusWidgetsMixin:
 
     def _enqueue_eval(self, code, **lite_data):
         """Internal helper to enqueue JS evaluation or store for lite mode"""
+        import asyncio
+        from ..context import session_ctx
+
         if self.mode == 'ws':
-            store = get_session_store()
-            if 'eval_queue' not in store: store['eval_queue'] = []
-            store['eval_queue'].append(code)
+            sid = session_ctx.get()
+            if sid and getattr(self, 'ws_engine', None) and sid in self.ws_engine.sockets:
+                try:
+                    loop = asyncio.get_running_loop()
+                    store = get_session_store()
+                    if 'eval_queue' not in store: store['eval_queue'] = []
+                    store['eval_queue'].append(code)
+                except RuntimeError:
+                    # Sync context (e.g. background thread) -> push immediately
+                    _loop = asyncio.new_event_loop()
+                    try:
+                        _loop.run_until_complete(self.ws_engine.push_eval(sid, code))
+                    finally:
+                        _loop.close()
+            else:
+                store = get_session_store()
+                if 'eval_queue' not in store: store['eval_queue'] = []
+                store['eval_queue'].append(code)
         else:
             store = get_session_store()
             if 'toasts' not in store: store['toasts'] = []

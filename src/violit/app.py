@@ -35,6 +35,7 @@ from .component import Component
 from .engine import LiteEngine, WsEngine
 from .state import State, get_session_store
 from .broadcast import Broadcaster
+from .background import BackgroundTask
 import asyncio
 
 # Import all widget mixins
@@ -1091,6 +1092,63 @@ class App(
         threading.Thread(target=_run, daemon=True).start()
 
     # ─── End Interval API ─────────────────────────────────────────
+
+    # ─── Background Task API ──────────────────────────────────────
+
+    def background(
+        self,
+        fn: Callable,
+        on_complete: Optional[Callable] = None,
+        on_error: Optional[Callable] = None,
+        singleton: bool = False,
+        max_workers: int = 4,
+        executor: str = "thread",
+    ) -> 'BackgroundTask':
+        """Run a long-running function in the background without blocking the UI.
+        
+        The function executes in a worker thread. State changes inside the
+        function are automatically pushed to the user who started the task.
+        Other users and UI interactions are unaffected.
+        
+        Args:
+            fn:          Function to run in the background
+            on_complete: Optional callback when the task finishes successfully
+            on_error:    Optional callback(exception) when the task fails
+            singleton:   If True, prevents starting a second instance while running
+            max_workers: Max concurrent background tasks (shared pool, default: 4)
+            executor:    'thread' (default) or 'process' (for CPU-heavy, future)
+        
+        Returns:
+            BackgroundTask handle with start() / cancel() / state / is_running
+        
+        Example:
+            progress = app.state(0)
+            
+            def train():
+                for i in range(100):
+                    model.train_one_epoch()
+                    progress.set(i / 100)
+            
+            task = app.background(
+                train,
+                on_complete=lambda: app.toast('Training complete!', 'success'),
+                on_error=lambda e: app.toast(f'Error: {e}', 'danger'),
+            )
+            app.button('Start Training', on_click=task.start)
+            app.button('Cancel', on_click=task.cancel)
+            app.progress_bar(progress)
+        """
+        return BackgroundTask(
+            fn=fn,
+            app=self,
+            on_complete=on_complete,
+            on_error=on_error,
+            singleton=singleton,
+            max_workers=max_workers,
+            executor=executor,
+        )
+
+    # ─── End Background Task API ──────────────────────────────────
 
     def navigation(self, pages: List[Any], position="sidebar", auto_run=True, reactivity_mode=False):
         """Create multi-page navigation

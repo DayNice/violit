@@ -799,7 +799,17 @@ class App(
         # Resolve positional vs keyword
         actual_render = render_fn if render_fn is not None else render
         actual_empty = empty_fn if empty_fn is not None else empty
-        
+
+        # Check once at registration time whether render_fn accepts (item, index) or just (item).
+        # Caching this avoids calling inspect.signature() on every item on every render.
+        _render_with_index = False
+        if actual_render is not None:
+            try:
+                sig = inspect.signature(actual_render)
+                _render_with_index = len(sig.parameters) >= 2
+            except (ValueError, TypeError):
+                _render_with_index = False
+
         cid = self._get_next_cid("for")
         
         def for_builder():
@@ -847,10 +857,8 @@ class App(
                         prev_order = store['order'].copy()
                         store['order'] = []
                         
-                        # Try to call with (item, index), fall back to (item)
-                        import inspect
-                        sig = inspect.signature(actual_render)
-                        if len(sig.parameters) >= 2:
+                        # Use the signature check cached at For() registration time
+                        if _render_with_index:
                             actual_render(item, idx)
                         else:
                             actual_render(item)

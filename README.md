@@ -1,7 +1,6 @@
 <p align="center">
-  <img width="2061" height="1210" alt="violit_glare" alt="Violit™ Logo"src="https://github.com/user-attachments/assets/f6a56e37-37a5-437c-ae16-13bff7029797" />  
+  <img src="https://github.com/user-attachments/assets/f6a56e37-37a5-437c-ae16-13bff7029797" alt="Violit Logo" width="100%">
 </p>
-
 
 
 # 💜 Violit

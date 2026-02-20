@@ -234,12 +234,23 @@ class ComputedState:
     def __call__(self):
         return self.value
 
+    # Reactive Comparison Operators
+    def __eq__(self, other): return ComputedState(lambda: self.value == (other.value if hasattr(other, 'value') else other))
+    def __ne__(self, other): return ComputedState(lambda: self.value != (other.value if hasattr(other, 'value') else other))
+    def __lt__(self, other): return ComputedState(lambda: self.value < (other.value if hasattr(other, 'value') else other))
+    def __le__(self, other): return ComputedState(lambda: self.value <= (other.value if hasattr(other, 'value') else other))
+    def __gt__(self, other): return ComputedState(lambda: self.value > (other.value if hasattr(other, 'value') else other))
+    def __ge__(self, other): return ComputedState(lambda: self.value >= (other.value if hasattr(other, 'value') else other))
+
     # Logical operators for chaining
     def __and__(self, other):
         return ComputedState(lambda: self.value and (other.value if hasattr(other, 'value') else other))
     
     def __or__(self, other):
         return ComputedState(lambda: self.value or (other.value if hasattr(other, 'value') else other))
+
+    def __invert__(self):
+        return ComputedState(lambda: not self.value)
 
     # Reactive Arithmetic Operators (Mirroring State)
     def __add__(self, other): 

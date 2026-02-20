@@ -2,6 +2,7 @@
 
 from typing import Union, Callable, Optional, List, Any
 import base64
+import html as html_lib
 import io
 import json
 from ..component import Component
@@ -86,7 +87,7 @@ class InputWidgetsMixin:
                 </script>
                 '''
             
-            html = f'<sl-checkbox id="{cid}" {checked_attr} {attrs_str} {props_str}>{label}</sl-checkbox>{listener_script}'
+            html = f'<sl-checkbox id="{cid}" {checked_attr} {attrs_str} {props_str}>{html_lib.escape(str(label))}</sl-checkbox>{listener_script}'
             _wd = self._get_widget_defaults("checkbox")
             _fc = merge_cls(_wd.get("cls", ""), cls)
             _fs = merge_style(_wd.get("style", ""), style)
@@ -114,7 +115,8 @@ class InputWidgetsMixin:
             opts_html = ""
             for opt in options:
                 sel = 'checked' if opt == cv else ''
-                opts_html += f'<sl-radio value="{opt}" {sel}>{opt}</sl-radio>'
+                escaped_opt = html_lib.escape(str(opt), quote=True)
+                opts_html += f'<sl-radio value="{escaped_opt}" {sel}>{escaped_opt}</sl-radio>'
             
             if self.mode == 'lite':
                 attrs_str = f'hx-post="/action/{cid}" hx-trigger="sl-change" hx-swap="none" name="value"'
@@ -137,7 +139,8 @@ class InputWidgetsMixin:
                 '''
             
             props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
-            html = f'<sl-radio-group id="{cid}" label="{label}" value="{cv}" {attrs_str} {props_str}>{opts_html}</sl-radio-group>{listener_script}'
+            escaped_cv = html_lib.escape(str(cv), quote=True)
+            html = f'<sl-radio-group id="{cid}" label="{label}" value="{escaped_cv}" {attrs_str} {props_str}>{opts_html}</sl-radio-group>{listener_script}'
             
             _wd = self._get_widget_defaults("radio")
             _fc = merge_cls(_wd.get("cls", ""), cls)
@@ -782,7 +785,8 @@ class InputWidgetsMixin:
                 '''
             
             props_str = ' '.join(f'{k}="{v}"' for k, v in props.items() if v is not None and v is not False)
-            html = f'<{tag_name} id="{cid}" label="{label}" value="{cv}" {attrs_str} {props_str}></{tag_name}>{listener_script}'
+            escaped_cv = html_lib.escape(str(cv), quote=True)
+            html = f'<{tag_name} id="{cid}" label="{label}" value="{escaped_cv}" {attrs_str} {props_str}></{tag_name}>{listener_script}'
             
             _wd = self._get_widget_defaults(type_name)
             _fc = merge_cls(_wd.get("cls", ""), cls)

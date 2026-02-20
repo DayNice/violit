@@ -80,6 +80,29 @@ def get_session_store():
         }
     return GLOBAL_STORE[sid]
 
+
+class Subscription:
+    """Handle returned by State.subscribe(). Call .cancel() to unsubscribe."""
+
+    def __init__(self, subscribers_list, entry):
+        self._list = subscribers_list
+        self._entry = entry
+        self._active = True
+
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    def cancel(self):
+        """Remove this callback from the subscriber list."""
+        if self._active:
+            try:
+                self._list.remove(self._entry)
+            except ValueError:
+                pass
+            self._active = False
+
+
 class State:
     def __init__(self, name: str, default_value: Any):
         object.__setattr__(self, 'name', name)
@@ -114,14 +137,14 @@ class State:
                     f"[state] subscriber error on '{self.name}': {e}"
                 )
 
-    def subscribe(self, callback) -> callable:
+    def subscribe(self, callback) -> 'Subscription':
         """Register a side-effect callback fired on every set().
 
         Callback signature options:
             callback(new_val)            – receives new value only
             callback(new_val, old_val)   – receives new and previous value
 
-        Returns an unsubscribe function.
+        Returns a Subscription object. Call .cancel() to unsubscribe.
         """
         import inspect
         try:
@@ -130,12 +153,7 @@ class State:
             wants_old = False
         entry = (callback, wants_old)
         self._subscribers.append(entry)
-        def unsub():
-            try:
-                self._subscribers.remove(entry)
-            except ValueError:
-                pass
-        return unsub
+        return Subscription(self._subscribers, entry)
 
     def on_change(self, callback):
         """Decorator form of subscribe.

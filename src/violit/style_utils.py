@@ -51,6 +51,31 @@ def merge_style(*style_strings: str) -> str:
     return result.strip()
 
 
+def resolve_value(arg):
+    """Resolve a reactive argument to its plain value at render time.
+
+    Handles the three reactive forms Violit supports:
+    - State / ComputedState   → .value
+    - callable (lambda/func)  → called with no arguments
+    - plain value             → returned as-is
+
+    Use this inside every builder that accepts content arguments so that
+    State, ComputedState, and lambda are all evaluated correctly.
+
+    Example::
+
+        val = str(resolve_value(body))          # single arg
+        parts = [str(resolve_value(a)) for a in args]  # *args
+    """
+    # Import here to avoid circular imports (style_utils is a leaf module)
+    from .state import State, ComputedState  # noqa: PLC0415
+    if isinstance(arg, (State, ComputedState)):
+        return arg.value
+    if callable(arg):
+        return arg()
+    return arg
+
+
 def wrap_html(html: str, cls: str = "", style: str = "") -> str:
     """Wrap HTML content with a div if cls or style are provided.
     

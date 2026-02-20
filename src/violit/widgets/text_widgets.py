@@ -634,29 +634,3 @@ class TextWidgetsMixin:
             return Component("sl-divider", id=cid, class_=_fc, style=_fs or None)
         self._register_component(cid, builder)
 
-    def success(self, body, icon="check-circle", cls: str = "", style: str = ""):
-        """Display success message"""
-        self._alert(body, "success", icon, cls=cls, style=style)
-
-    def info(self, body, icon="info-circle", cls: str = "", style: str = ""):
-        """Display info message"""
-        self._alert(body, "primary", icon, cls=cls, style=style)
-
-    def warning(self, body, icon="exclamation-triangle", cls: str = "", style: str = ""):
-        """Display warning message"""
-        self._alert(body, "warning", icon, cls=cls, style=style)
-
-    def error(self, body, icon="exclamation-octagon", cls: str = "", style: str = ""):
-        """Display error message"""
-        self._alert(body, "danger", icon, cls=cls, style=style)
-
-    def _alert(self, body, variant, icon_name, cls: str = "", style: str = ""):
-        cid = self._get_next_cid("alert")
-        def builder():
-            icon_html = f'<sl-icon slot="icon" name="{icon_name}"></sl-icon>'
-            html = f'<sl-alert variant="{variant}" open style="margin-bottom:1rem;">{icon_html}{body}</sl-alert>'
-            _wd = self._get_widget_defaults("alert")
-            _fc = merge_cls(_wd.get("cls", ""), cls)
-            _fs = merge_style(_wd.get("style", ""), style)
-            return Component("div", id=cid, content=html, class_=_fc or None, style=_fs or None)
-        self._register_component(cid, builder)

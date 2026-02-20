@@ -6,7 +6,7 @@ import pandas as pd
 from ..component import Component
 from ..context import rendering_ctx
 from ..state import State
-from ..style_utils import merge_cls, merge_style
+from ..style_utils import merge_cls, merge_style, resolve_value
 
 
 class DataWidgetsMixin:
@@ -24,14 +24,10 @@ class DataWidgetsMixin:
         
         def builder():
             # Handle Signal
-            current_df = df
-            if isinstance(df, State):
-                token = rendering_ctx.set(cid)
-                current_df = df.value
-                rendering_ctx.reset(token)
-            elif callable(df):
-                token = rendering_ctx.set(cid)
-                current_df = df()
+            token = rendering_ctx.set(cid)
+            try:
+                current_df = resolve_value(df)
+            finally:
                 rendering_ctx.reset(token)
                 
             if not isinstance(current_df, pd.DataFrame):
@@ -103,14 +99,10 @@ class DataWidgetsMixin:
         cid = self._get_next_cid("table")
         def builder():
             # Handle Signal
-            current_df = df
-            if isinstance(df, State):
-                token = rendering_ctx.set(cid)
-                current_df = df.value
-                rendering_ctx.reset(token)
-            elif callable(df):
-                token = rendering_ctx.set(cid)
-                current_df = df()
+            token = rendering_ctx.set(cid)
+            try:
+                current_df = resolve_value(df)
+            finally:
                 rendering_ctx.reset(token)
             
             if not isinstance(current_df, pd.DataFrame):
@@ -242,26 +234,12 @@ class DataWidgetsMixin:
         cid = self._get_next_cid("metric")
         
         def builder():
-            # Handle value signal
-            curr_val = value
-            if isinstance(value, State):
-                token = rendering_ctx.set(cid)
-                curr_val = value.value
-                rendering_ctx.reset(token)
-            elif callable(value):
-                token = rendering_ctx.set(cid)
-                curr_val = value()
-                rendering_ctx.reset(token)
-                
-            # Handle delta signal
-            curr_delta = delta
-            if isinstance(delta, State):
-                token = rendering_ctx.set(cid)
-                curr_delta = delta.value
-                rendering_ctx.reset(token)
-            elif callable(delta):
-                token = rendering_ctx.set(cid)
-                curr_delta = delta()
+            # Handle value and delta signals in a single tracked block
+            token = rendering_ctx.set(cid)
+            try:
+                curr_val = resolve_value(value)
+                curr_delta = resolve_value(delta) if delta is not None else None
+            finally:
                 rendering_ctx.reset(token)
 
             # XSS protection: escape all values

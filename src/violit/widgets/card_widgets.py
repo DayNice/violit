@@ -5,7 +5,7 @@ Provides easy-to-use wrappers for Shoelace card components
 
 from ..component import Component
 from ..context import rendering_ctx
-from ..style_utils import merge_cls, merge_style
+from ..style_utils import merge_cls, merge_style, resolve_value
 
 
 class CardWidgetsMixin:
@@ -115,23 +115,27 @@ class CardWidgetsMixin:
         cid = self._get_next_cid("badge")
         
         def builder():
+            import html as html_lib
             token = rendering_ctx.set(cid)
-            
+            try:
+                resolved_text = str(resolve_value(text))
+            finally:
+                rendering_ctx.reset(token)
+
             attrs = [f'variant="{variant}"']
             if pill:
                 attrs.append('pill')
             if pulse:
                 attrs.append('pulse')
-            
+
             attrs_str = ' '.join(attrs)
-            html = f'<sl-badge {attrs_str}>{text}</sl-badge>'
-            
-            rendering_ctx.reset(token)
+            escaped_text = html_lib.escape(resolved_text)
+            html = f'<sl-badge {attrs_str}>{escaped_text}</sl-badge>'
             _wd = self._get_widget_defaults("badge")
             _fc = merge_cls(_wd.get("cls", ""), cls)
             _fs = merge_style(_wd.get("style", ""), style)
             return Component("span", id=cid, content=html, class_=_fc or None, style=_fs or None)
-        
+
         self._register_component(cid, builder)
     
     def icon(self, name, size=None, label=None, cls: str = "", style: str = ""):

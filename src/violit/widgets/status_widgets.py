@@ -4,7 +4,7 @@ from typing import Union, Callable, Optional
 from ..component import Component
 from ..context import rendering_ctx
 from ..state import get_session_store, State
-from ..style_utils import merge_cls, merge_style
+from ..style_utils import merge_cls, merge_style, resolve_value
 
 
 class StatusWidgetsMixin:
@@ -27,32 +27,24 @@ class StatusWidgetsMixin:
         self.alert(*args, variant="primary", icon="info-circle", cls=cls, style=style)
     
     def alert(self, *args, variant="primary", icon=None, cls: str = "", style: str = ""):
-        """Display alert message with Signal support (multiple arguments supported)"""
+        """Display alert message.
+
+        Each positional argument may be a plain value, State, ComputedState,
+        or a callable (lambda / function).  All are resolved at render time
+        so the widget stays reactive.
+        Multiple arguments are joined with a space.
+        """
         import html as html_lib
-        from ..state import State, ComputedState
-        
+
         cid = self._get_next_cid("alert")
         def builder():
-            # Signal handling for multiple arguments
-            parts = []
             token = rendering_ctx.set(cid)
-            
             try:
-                for arg in args:
-                    if isinstance(arg, (State, ComputedState)):
-                        parts.append(str(arg.value))
-                    elif callable(arg):
-                        parts.append(str(arg()))
-                    else:
-                        parts.append(str(arg))
+                parts = [str(resolve_value(arg)) for arg in args]
             finally:
                 rendering_ctx.reset(token)
-            
-            val = " ".join(parts)
-            
-            # XSS protection: escape content
-            escaped_val = html_lib.escape(str(val))
-            
+
+            escaped_val = html_lib.escape(" ".join(parts))
             icon_html = f'<sl-icon slot="icon" name="{icon}"></sl-icon>' if icon else ""
             html_output = f'<sl-alert variant="{variant}" open>{icon_html}{escaped_val}</sl-alert>'
             _wd = self._get_widget_defaults("alert")

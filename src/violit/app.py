@@ -35,6 +35,7 @@ from .component import Component
 from .engine import LiteEngine, WsEngine
 from .state import State, get_session_store
 from .broadcast import Broadcaster
+import asyncio
 
 # Import all widget mixins
 from .widgets import (
@@ -145,6 +146,53 @@ class Page:
         self.entry_point()
 
 
+class IntervalHandle:
+    """Handle returned by app.interval() for controlling the timer.
+    
+    Methods:
+        pause()   - Pause the timer (ticks stop firing)
+        resume()  - Resume a paused timer
+        stop()    - Permanently stop and unregister the timer
+    
+    Properties:
+        state      - Current state: 'running' | 'paused' | 'stopped'
+        is_running - True if state == 'running'
+    """
+    def __init__(self, interval_id: str, app: 'App'):
+        self._id = interval_id
+        self._app = app
+
+    @property
+    def state(self) -> str:
+        info = self._app._interval_callbacks.get(self._id)
+        return info['state'] if info else 'stopped'
+
+    @property
+    def is_running(self) -> bool:
+        return self.state == 'running'
+
+    def pause(self):
+        """Pause the timer. Ticks stop until resume() is called."""
+        info = self._app._interval_callbacks.get(self._id)
+        if info and info['state'] == 'running':
+            info['state'] = 'paused'
+            self._app._send_interval_ctrl(self._id, 'pause')
+
+    def resume(self):
+        """Resume a paused timer."""
+        info = self._app._interval_callbacks.get(self._id)
+        if info and info['state'] == 'paused':
+            info['state'] = 'running'
+            self._app._send_interval_ctrl(self._id, 'resume')
+
+    def stop(self):
+        """Permanently stop the timer and unregister the callback."""
+        if self._id in self._app._interval_callbacks:
+            self._app._interval_callbacks[self._id]['state'] = 'stopped'
+            self._app._send_interval_ctrl(self._id, 'stop')
+            del self._app._interval_callbacks[self._id]
+
+
 class App(
     TextWidgetsMixin,
     InputWidgetsMixin,
@@ -230,6 +278,10 @@ class App(
         # Broadcasting System
         self.broadcaster = Broadcaster(self)
         self._fragment_count = 0 # Used for  App.reactivity (with or decorator)
+        
+        # Interval System (app.interval API)
+        self._interval_count = 0
+        self._interval_callbacks: Dict[str, Dict] = {}
         
         # Internal theme/settings state
         self._theme_state = self.state(self.theme_manager.mode)
@@ -948,6 +1000,98 @@ class App(
             return Component("div", id=cid, style="display:none", content=script_content)
         self._register_component(cid, builder)
 
+    # ─── Interval API ──────────────────────────────────────────────
+
+    def interval(
+        self,
+        callback: Callable,
+        ms: int = 1000,
+        condition: Optional[Callable[[], bool]] = None,
+        autostart: bool = True,
+    ) -> IntervalHandle:
+        """Register a periodic timer that calls a Python callback.
+        
+        Uses client-side setInterval to send lightweight 'tick' messages
+        over WebSocket. No DOM manipulation, no hidden buttons.
+        
+        Args:
+            callback:   Function to call on each tick
+            ms:         Interval in milliseconds (default: 1000)
+            condition:  Optional callable returning bool.
+                        If provided, callback only fires when condition() is True.
+                        Useful with State: condition=lambda: pump_on.value
+            autostart:  If True (default), timer starts immediately.
+                        If False, call handle.resume() to start.
+        
+        Returns:
+            IntervalHandle with pause() / resume() / stop() / state
+        
+        Example:
+            timer = app.interval(update_data, ms=500)
+            app.button("Pause", on_click=timer.pause)
+            app.button("Resume", on_click=timer.resume)
+            
+            # Conditional:
+            app.interval(poll, ms=1000, condition=lambda: is_active.value)
+        """
+        interval_id = f"__vl_interval_{self._interval_count}__"
+        self._interval_count += 1
+
+        initial_state = 'running' if autostart else 'paused'
+
+        self._interval_callbacks[interval_id] = {
+            'callback':  callback,
+            'ms':        ms,
+            'condition': condition,
+            'state':     initial_state,
+        }
+
+        # Inject minimal JS to create the client-side interval.
+        # _vlCreateInterval is defined in the HTML template's script block.
+        autostart_js = 'true' if autostart else 'false'
+        self.html(f"""
+        <script>
+        (function() {{
+            function _init() {{
+                if (typeof window._vlCreateInterval === 'function') {{
+                    window._vlCreateInterval('{interval_id}', {ms}, {autostart_js});
+                }} else {{
+                    setTimeout(_init, 100);
+                }}
+            }}
+            _init();
+        }})();
+        </script>
+        """)
+
+        return IntervalHandle(interval_id, self)
+
+    def _send_interval_ctrl(self, interval_id: str, action: str):
+        """Send interval control message (pause/resume/stop) to all connected clients."""
+        if not self.ws_engine:
+            return
+
+        async def _push():
+            for sid, ws_sock in list(self.ws_engine.sockets.items()):
+                try:
+                    await ws_sock.send_json({
+                        'type': 'interval_ctrl',
+                        'id':   interval_id,
+                        'action': action,
+                    })
+                except Exception:
+                    pass
+
+        def _run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(_push())
+            loop.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    # ─── End Interval API ─────────────────────────────────────────
+
     def navigation(self, pages: List[Any], position="sidebar", auto_run=True, reactivity_mode=False):
         """Create multi-page navigation
         
@@ -1397,7 +1541,28 @@ class App(
             
             # Message processing function
             async def process_message(data):
-                if data.get('type') != 'click':
+                msg_type = data.get('type')
+                
+                # ── Interval tick handler ──────────────────────────
+                if msg_type == 'tick':
+                    interval_id = data.get('id')
+                    info = self._interval_callbacks.get(interval_id)
+                    if info and info['state'] == 'running':
+                        condition = info.get('condition')
+                        if condition is None or condition():
+                            store = get_session_store()
+                            store['eval_queue'] = []
+                            info['callback']()
+                            for code in store.get('eval_queue', []):
+                                await self.ws_engine.push_eval(sid, code)
+                            store['eval_queue'] = []
+                            dirty = self._get_dirty_rendered()
+                            if dirty:
+                                await self.ws_engine.push_updates(sid, dirty)
+                    return
+                # ── End interval tick handler ──────────────────────
+                
+                if msg_type != 'click':
                     return
                 
                 # Debug WebSocket data
@@ -2242,6 +2407,65 @@ HTML_TEMPLATE = """
 
 
         if (mode === 'ws') {
+            // ── Interval Infrastructure ───────────────────────────
+            window._vlIntervals = window._vlIntervals || {};
+
+            window._vlCreateInterval = function(id, ms, autostart) {
+                if (window._vlIntervals[id]) return; // prevent duplicates
+
+                var ctrl = {
+                    _timer:   null,
+                    _paused:  !autostart,
+                    _stopped: false,
+                    _ms:      ms,
+                    _id:      id,
+
+                    _tick: function() {
+                        if (window._ws && window._ws.readyState === 1) {
+                            window._ws.send(JSON.stringify({ type: 'tick', id: id }));
+                        }
+                    },
+
+                    start: function() {
+                        if (!ctrl._paused && !ctrl._stopped && !ctrl._timer) {
+                            ctrl._timer = setInterval(ctrl._tick, ctrl._ms);
+                        }
+                    },
+
+                    pause: function() {
+                        ctrl._paused = true;
+                        if (ctrl._timer) { clearInterval(ctrl._timer); ctrl._timer = null; }
+                    },
+
+                    resume: function() {
+                        ctrl._paused = false;
+                        ctrl._stopped = false;
+                        ctrl.start();
+                    },
+
+                    stop: function() {
+                        ctrl._stopped = true;
+                        if (ctrl._timer) { clearInterval(ctrl._timer); ctrl._timer = null; }
+                        delete window._vlIntervals[id];
+                    }
+                };
+
+                window._vlIntervals[id] = ctrl;
+
+                // Wait for WebSocket to be ready, then start
+                if (autostart) {
+                    function waitAndStart() {
+                        if (window._ws && window._ws.readyState === 1) {
+                            ctrl.start();
+                        } else {
+                            setTimeout(waitAndStart, 200);
+                        }
+                    }
+                    waitAndStart();
+                }
+            };
+            // ── End Interval Infrastructure ───────────────────────
+
             // [FIX] Pre-define sendAction with queue to handle clicks before WebSocket connects
             // Use window properties for debugging access
             window._wsReady = false;
@@ -2489,6 +2713,14 @@ HTML_TEMPLATE = """
                 } else if (msg.type === 'eval') {
                     const func = new Function(msg.code);
                     func();
+                } else if (msg.type === 'interval_ctrl') {
+                    // Server-initiated interval control (pause/resume/stop)
+                    const ctrl = window._vlIntervals && window._vlIntervals[msg.id];
+                    if (ctrl) {
+                        if      (msg.action === 'pause')  ctrl.pause();
+                        else if (msg.action === 'resume') ctrl.resume();
+                        else if (msg.action === 'stop')   ctrl.stop();
+                    }
                 }
             };
         } else {

@@ -1784,6 +1784,7 @@ class App(
             
             # Must set VIOLIT_WORKER so that the child workers don't hit this block again
             os.environ["VIOLIT_WORKER"] = "1"
+            os.environ["VIOLIT_WEB_RELOAD_WORKER"] = "1"
             
             try:
                 uvicorn.run(
@@ -2096,6 +2097,12 @@ class App(
                 
                 reload_tag = " (hot reload)" if args.reload else ""
                 print(f"INFO:     Violit web app running on http://localhost:{args.port}{reload_tag}")
+            
+            # CRITICAL FIX: If we are running inside the Uvicorn child worker process
+            # (which spawns and imports __main__ in Windows), DO NOT run blocking uvicorn again.
+            if os.environ.get("VIOLIT_WEB_RELOAD_WORKER") == "1":
+                return
+                
             uvicorn.run(self.fastapi, host="0.0.0.0", port=args.port)
 
 

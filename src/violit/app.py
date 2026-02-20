@@ -217,11 +217,11 @@ class App(
         self.static_order: List[str] = []
         self.static_sidebar_order: List[str] = []
         self.static_actions: Dict[str, Callable] = {}
-        self.static_fragments: Dict[str, Callable] = {}
-        self.static_fragment_components: Dict[str, List[Any]] = {}
+        self.static_fragments: Dict[str, Callable] = {} # Deprecated. It was for the @app.fragments decorator.
+        self.static_fragment_components: Dict[str, List[Any]] = {} # For children components of container widgets.
         
         self.state_count = 0
-        self._fragments: Dict[str, Callable] = {}
+        self._fragments: Dict[str, Callable] = {} # Deprecated. It was used for dynamci fragment, but fragment_components in session store is used now.
         
         # Styling System: configure_widget defaults + user CSS
         self._widget_defaults: Dict[str, Dict[str, str]] = {}
@@ -229,7 +229,7 @@ class App(
         
         # Broadcasting System
         self.broadcaster = Broadcaster(self)
-        self._fragment_count = 0
+        self._fragment_count = 0 # Used for  App.reactivity (with or decorator)
         
         # Internal theme/settings state
         self._theme_state = self.state(self.theme_manager.mode)

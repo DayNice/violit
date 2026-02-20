@@ -1236,11 +1236,12 @@ class App(
         
         if not final_pages: return None
         
-        # Singleton state for navigation
-        current_page_key_state = self.state(final_pages[0].key, key="__nav_selection__")
-        
         # Navigation Menu Builder
         cid = self._get_next_cid("nav_menu")
+
+        # Per-instance state key derived from cid — allows multiple navigation()
+        # instances (e.g. sidebar + top tabs) to coexist without sharing state.
+        current_page_key_state = self.state(final_pages[0].key, key=f"__nav_selection_{cid}__")
         nav_cid = cid  # Capture for use in nav_action closure
         def nav_builder():
             token = rendering_ctx.set(cid)

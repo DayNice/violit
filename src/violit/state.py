@@ -84,6 +84,7 @@ class State:
     def __init__(self, name: str, default_value: Any):
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'default_value', default_value)
+        object.__setattr__(self, '_subscribers', [])  # list of (callback, wants_old_val)
 
     @property
     def value(self):
@@ -99,9 +100,54 @@ class State:
 
     def set(self, new_value: Any):
         store = get_session_store()
+        old_value = store['states'].get(self.name, self.default_value)
         store['states'][self.name] = new_value
         if 'dirty_states' not in store: store['dirty_states'] = set()
         store['dirty_states'].add(self.name)
+        # Fire side-effect subscribers
+        for cb, wants_old in list(self._subscribers):
+            try:
+                cb(new_value, old_value) if wants_old else cb(new_value)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(
+                    f"[state] subscriber error on '{self.name}': {e}"
+                )
+
+    def subscribe(self, callback) -> callable:
+        """Register a side-effect callback fired on every set().
+
+        Callback signature options:
+            callback(new_val)            – receives new value only
+            callback(new_val, old_val)   – receives new and previous value
+
+        Returns an unsubscribe function.
+        """
+        import inspect
+        try:
+            wants_old = len(inspect.signature(callback).parameters) >= 2
+        except (ValueError, TypeError):
+            wants_old = False
+        entry = (callback, wants_old)
+        self._subscribers.append(entry)
+        def unsub():
+            try:
+                self._subscribers.remove(entry)
+            except ValueError:
+                pass
+        return unsub
+
+    def on_change(self, callback):
+        """Decorator form of subscribe.
+
+        Usage::
+
+            @count.on_change
+            def _(new_val):
+                db.save('count', new_val)
+        """
+        self.subscribe(callback)
+        return callback
     
     def __setattr__(self, attr: str, val: Any):
         if attr == 'value':

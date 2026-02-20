@@ -11,25 +11,31 @@ from ..style_utils import merge_cls, merge_style
 
 
 # [OPTIMIZED] Plotly render script with fast updates
-# - Uses Plotly.newPlot for first render, Plotly.react for updates
-# - Single rAF instead of double (saves ~16ms)
-# - Hidden containers still defer via IntersectionObserver
+# - Uses global Set (window._vlPlotlyInited) instead of DOM attribute
+#   → survives outerHTML replacement, preventing flicker on reactive updates
+# - Already-initialized charts skip clientWidth check and IntersectionObserver delay
+# - Uses Plotly.react() for updates (no two-pass sizing = no flicker)
 _PLOTLY_RENDER_SCRIPT = """
 <script>(function(){{
     var d = {fj};
     var cid = '{cid}';
     var cfg = {{responsive: true, displayModeBar: false}};
 
+    // ✅ Use global Set instead of DOM attribute.
+    // DOM attribute is wiped on outerHTML replacement; JS memory is not.
+    if (!window._vlPlotlyInited) window._vlPlotlyInited = new Set();
+
     function _vlDraw() {{
         var el = document.getElementById(cid);
         if (!el || !window.Plotly) return;
         d.layout.autosize = true;
         delete d.layout.width;
-        // Use newPlot for first render, react for updates
-        if (el.hasAttribute('data-plotly-init')) {{
+        delete d.layout.height;  // Let CSS/container control height
+        if (window._vlPlotlyInited.has(cid)) {{
+            // Already initialized (even after DOM replacement): use react()
             Plotly.react(cid, d.data, d.layout, cfg);
         }} else {{
-            el.setAttribute('data-plotly-init', '1');
+            window._vlPlotlyInited.add(cid);
             Plotly.newPlot(cid, d.data, d.layout, cfg);
         }}
     }}
@@ -41,6 +47,13 @@ _PLOTLY_RENDER_SCRIPT = """
     function initPlot() {{
         var el = document.getElementById(cid);
         if (!el) return;
+
+        // ✅ Already initialized: skip clientWidth check and IntersectionObserver.
+        // After outerHTML replacement the element is new but _vlPlotlyInited remembers it.
+        if (window._vlPlotlyInited.has(cid)) {{
+            _vlSchedule();
+            return;
+        }}
 
         if (el.clientWidth < 10) {{
             var io = new IntersectionObserver(function(entries) {{

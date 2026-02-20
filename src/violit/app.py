@@ -891,7 +891,20 @@ class App(
             for cid in cids:
                 builder = store['builders'].get(cid) or self.static_builders.get(cid)
                 if builder:
-                    target_list.append(builder().render())
+                    try:
+                        target_list.append(builder().render())
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).error(
+                            f"[render] component '{cid}' failed: {e}"
+                        )
+                        target_list.append(
+                            f'<div id="{cid}" style="border:1px solid var(--sl-color-danger-600,red);'
+                            f'padding:0.75rem;border-radius:0.375rem;color:var(--sl-color-danger-600,red);'
+                            f'font-size:0.85rem;">'
+                            f'⚠ Render error in <code>{cid}</code>: {e}'
+                            f'</div>'
+                        )
 
         # Static Components
         render_cids(self.static_order, main_html)
@@ -927,7 +940,21 @@ class App(
                 # 1. Dependencies that are no longer read get removed.
                 # 2. The upcoming builder() call re-registers only current deps.
                 tracker.unregister_component(cid)
-                res.append(builder())
+                try:
+                    res.append(builder())
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error(
+                        f"[render] dirty component '{cid}' failed: {e}"
+                    )
+                    from .component import Component
+                    res.append(Component(
+                        "div", id=cid,
+                        content=(
+                            f'<span style="color:var(--sl-color-danger-600,red);font-size:0.85rem;">'
+                            f'⚠ Render error in <code>{cid}</code>: {e}</span>'
+                        )
+                    ))
             else:
                 # Component is permanently gone (e.g. navigation page switch,
                 # If-block condition flip).  Clean it from the tracker so it
@@ -1814,7 +1841,7 @@ class App(
             try:
                 uvicorn.run(
                     uvicorn_target,
-                    host="0.0.0.0",
+                    host="127.0.0.1",
                     port=args.port,
                     reload=True,
                     reload_dirs=[reload_dir],

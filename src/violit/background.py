@@ -269,15 +269,24 @@ class BackgroundTask:
             if not dirty:
                 return
 
-            # We're in a worker thread, so we need to run the async push
-            # on a new event loop (can't use the main FastAPI loop from here)
-            loop = asyncio.new_event_loop()
-            try:
-                loop.run_until_complete(
-                    self._app.ws_engine.push_updates(sid, dirty)
+            main_loop = getattr(self._app, '_main_loop', None)
+            if main_loop is not None and main_loop.is_running():
+                # Submit the coroutine to uvicorn's loop from this worker thread.
+                # run_coroutine_threadsafe is thread-safe and reuses the existing loop.
+                future = asyncio.run_coroutine_threadsafe(
+                    self._app.ws_engine.push_updates(sid, dirty),
+                    main_loop,
                 )
-            finally:
-                loop.close()
+                future.result(timeout=5)  # block until sent (or timeout)
+            else:
+                # Fallback: main loop not captured yet (e.g. HTMX/lite mode)
+                loop = asyncio.new_event_loop()
+                try:
+                    loop.run_until_complete(
+                        self._app.ws_engine.push_updates(sid, dirty)
+                    )
+                finally:
+                    loop.close()
 
             logger.debug(f"[background] Pushed {len(dirty)} updates to session {sid[:8]}...")
 

@@ -340,6 +340,7 @@ class App(
         
         self.ws_engine = WsEngine() if mode == 'ws' else None
         self.lite_engine = LiteEngine() if mode == 'lite' else None
+        self._main_loop: asyncio.AbstractEventLoop | None = None
         app_instance_ref[0] = self
         
         # Register core fragments/updaters
@@ -1659,6 +1660,12 @@ class App(
             sid = ws.cookies.get("ss_sid") or str(uuid.uuid4())
             
             self.debug_print(f"[WEBSOCKET] Session: {sid[:8]}...")
+
+            # Capture uvicorn's event loop once — used by background tasks
+            # to push updates via run_coroutine_threadsafe instead of
+            # spawning a new loop per push.
+            if self._main_loop is None:
+                self._main_loop = asyncio.get_event_loop()
             
             # Set session context (outside while loop - very important!)
             t = session_ctx.set(sid)

@@ -140,8 +140,8 @@ class MediaWidgetsMixin:
         
         self._register_component(cid, builder)
 
-    def video(self, video, format="video/mp4", start_time=0, cls: str = "", style: str = "", **props):
-        """Display video player"""
+    def video(self, video, format="video/mp4", start_time=0, caption=None, width=None, use_column_width=False, autoplay=False, loop=False, muted=False, cls: str = "", style: str = "", **props):
+        """Display video player with various controls and sources"""
         cid = self._get_next_cid("video")
         
         def builder():
@@ -169,11 +169,37 @@ class MediaWidgetsMixin:
             else:
                 video_src = str(video)
             
+            # Handle start time
+            if start_time > 0 and "#t=" not in video_src:
+                video_src = f"{video_src}#t={start_time}"
+            
+            # Additional attributes
+            attrs = ["controls"]
+            if autoplay: attrs.append("autoplay")
+            if loop: attrs.append("loop")
+            if muted: attrs.append("muted")
+            
+            # Width styling
+            width_style = ""
+            if use_column_width or width == "auto":
+                width_style = "width: 100%;"
+            elif width:
+                width_style = f"width: {width}px;"
+            else:
+                width_style = "width: 100%;" # Default to 100% for video
+
+            caption_html = ""
+            if caption:
+                caption_html = f'<div style="text-align:center;margin-top:0.5rem;color:var(--sl-text-muted);font-size:0.875rem;">{caption}</div>'
+            
             html = f'''
-            <video controls style="width:100%;border-radius:0.5rem;">
-                <source src="{video_src}" type="{format}">
-                Your browser does not support the video element.
-            </video>
+            <div class="video-container" style="text-align:center; position: relative;">
+                <video {" ".join(attrs)} style="{width_style} height:auto; border-radius:12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); border: 1px solid var(--sl-border);">
+                    <source src="{video_src}" type="{format}">
+                    Your browser does not support the video element.
+                </video>
+                {caption_html}
+            </div>
             '''
             _wd = self._get_widget_defaults("video")
             _fc = merge_cls(_wd.get("cls", ""), cls)
